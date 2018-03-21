@@ -37,7 +37,10 @@ def normal_aposteriori(values, weights, std, prior_mean, prior_std):
     expected_mean = (prior_mean / prior_std**2 + sum / std**2) / precision
     expected_std = 1/precision
     return expected_mean, expected_std
-    
+
+###
+print(discretize_gaussian(0, 10, 3, 2))
+
 ### construct & evaluate uncertainty with Gaussian distributed data points. Calculate L1 worstcase return
 def evaluate_gaussian_uncertainty(num_samples, confidence_level, num_simulation, value_function, min_demand = 0,\
                         max_demand = 100, demand_mean_prior_mean = 50, demand_mean_prior_std = 15, true_demand_std = 25):

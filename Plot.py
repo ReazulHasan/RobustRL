@@ -6,6 +6,8 @@ font = {'weight' : 'normal',
 
 plt.rc('font', **font)
 
+LI_COLORS = ['b','c','r','g','m']
+
 # The method takes the data as the first parameter & name of the methods to compare & the figure name
 def plot_returns(results_dir, sample_steps, compare_methods, figure_name="Return_compare.pdf"):
     method_names = [r[0] for r in results_dir[0]]
@@ -16,9 +18,9 @@ def plot_returns(results_dir, sample_steps, compare_methods, figure_name="Return
             continue
         mean = np.array([r[method_index][1] for r in results_dir])
         sigma = np.array([r[method_index][5] for r in results_dir])
-        print(mean, sigma, mean + 1.96 * sigma)
-        plt.plot(sample_steps, mean, '+-', label = method_name.value)
-        plt.fill_between(sample_steps, mean - 1.96 * sigma, mean + 1.96 * sigma, alpha=0.2)
+        #print(mean, sigma, mean + 1.96 * sigma)
+        plt.plot(sample_steps, mean, '+-', label = method_name.value, color=LI_COLORS[method_index])
+        plt.fill_between(sample_steps, mean - 1.96 * sigma, mean + 1.96 * sigma, alpha=0.2, color=LI_COLORS[method_index])
 
     plt.xlabel('Number of samples'+r'$(N)$')
     plt.ylabel('Calculated return error: '+r'$\rho^* - \rho(\xi)$')
@@ -38,8 +40,8 @@ def plot_thresholds(results_dir, sample_steps, compare_methods, figure_name="Thr
             continue
         mean = np.array([r[method_index][2] for r in results_dir])
         sigma = np.array([r[method_index][6] for r in results_dir])
-        plt.plot(sample_steps, [r[method_index][2] for r in results_dir], '+-', label = method_name.value)
-        plt.fill_between(sample_steps, mean - 1.96 * sigma, mean + 1.96 * sigma, alpha=0.3)
+        plt.plot(sample_steps, [r[method_index][2] for r in results_dir], '+-', label = method_name.value, color=LI_COLORS[method_index])
+        plt.fill_between(sample_steps, mean - 1.96 * sigma, mean + 1.96 * sigma, alpha=0.3, color=LI_COLORS[method_index])
     
     plt.xlabel('number of samples'+r'$(N)$')
     plt.ylabel(r'$L_1$'+' threshold')
@@ -58,7 +60,7 @@ def plot_violations(results_dir, sample_steps, compare_methods, figure_name="Vio
     for method_index, method_name in enumerate(method_names):
         if method_name not in compare_methods:
             continue
-        plt.plot(sample_steps, [r[method_index][3] for r in results_dir], '+-', label = method_name.value)
+        plt.plot(sample_steps, [r[method_index][3] for r in results_dir], '+-', label = method_name.value, color=LI_COLORS[method_index])
     plt.xlabel('number of samples')
     plt.ylabel('fraction violated')
     #plt.title('L1 threshold values')

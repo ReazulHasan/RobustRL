@@ -10,15 +10,15 @@ import tqdm
 ### Run Bayesian Experiments
 if __name__ == "__main__":
     # number of assumes states in the MDP
-    num_next_states = 10
+    num_next_states = 5
     # number of sampling steps
-    num_iterations = 30
+    num_iterations = 5
     # the desired confidence level
     confidence_level = 0.90
     # number of runs
-    runs = 20
+    runs = 5
     # step size in the number of samples
-    sample_step = 20
+    sample_step = 5
     
     value_function = np.random.randint(10, size=num_next_states)
     #define reward for the simple mdp with 1 state, 1 action, num_next_states number of next states with uniform transition probability
@@ -30,12 +30,23 @@ if __name__ == "__main__":
     for pos, i in enumerate(tqdm.tqdm(sample_steps)):
         bayes_results.append(evaluate_bayesian_uncertainty(i, num_next_states, reward, confidence_level, runs, value_function))
 
+###Save results
+import pickle
+
+with open('dumped_results/Bayes_result_'+str(num_next_states)+"_"+str(num_iterations)\
+        +"_"+str(confidence_level)+"_"+str(runs)+"_"+str(sample_step),'wb') as fp:
+    
+    pickle.dump(bayes_results, fp)
+
+#with open ('outfile', 'rb') as fp:
+#    itemlist = pickle.load(fp)
 
 ### Plot Bayesian Results
 if __name__ == "__main__":
-    #plot_returns(bayes_results, sample_steps, [Methods.BAYES, Methods.EM, Methods.KNOWNV], "Bayes_return_BEK.pdf")
-    #plot_thresholds(bayes_results, sample_steps, [Methods.BAYES, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.EM, Methods.KNOWNV], "Bayes_threshold_comparison.pdf")
-    plot_violations(bayes_results, sample_steps, [Methods.BAYES, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.EM, Methods.KNOWNV], "bayesian_violations_hoeff_vs_tight.pdf")
+    plot_returns(bayes_results, sample_steps, [Methods.BAYES, Methods.HOEFF, Methods.HOEFFTIGHT], "Bayes_return_BHHT.pdf")
+    plot_returns(bayes_results, sample_steps, [Methods.BAYES, Methods.EM, Methods.KNOWNV], "Bayes_return_BEK.pdf")
+    plot_thresholds(bayes_results, sample_steps, [Methods.BAYES, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.EM, Methods.KNOWNV], "Bayes_threshold_comparison.pdf")
+    plot_violations(bayes_results, sample_steps, [Methods.BAYES, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.EM, Methods.KNOWNV], "Bayes_violations_comparison.pdf")
 
 
 ### Run Gaussian Experiments
@@ -69,7 +80,7 @@ if __name__ == "__main__":
 if __name__ == "__main__":
     initial, max_inventory, purchase_cost, sale_price = 0, 50, 2.0, 3.0,
     prior_mean, prior_std, demand_std, rand_seed =  10.0, 5.0, 6.0, 3
-    horizon, runs = 10, 5
+    horizon, runs = 50, 1000
     inventory_simulator = crobust.SimulatorInventory(initial, prior_mean, prior_std, demand_std, purchase_cost, sale_price, max_inventory, rand_seed)
     samples = inventory_simulator.simulate_inventory(horizon, runs)
     
@@ -79,11 +90,13 @@ if __name__ == "__main__":
     
     demands = []
     for i in range(len(states_from)):
-        demands.append(states_from[i] + actions[i] - states_to[i])   
+        demands.append(states_from[i] + actions[i] - states_to[i])
     
     smdp = crobust.SampledMDP()
     smdp.add_samples(samples)
     mdp = smdp.get_mdp(0.9)
+    
+    print("Original MDP: ", mdp.to_json())
     
     state_count = mdp.state_count()
     action_count = 0
@@ -137,65 +150,83 @@ if __name__ == "__main__":
 generic_plot(sample_steps, calc_return, "Number of samples", "Return on the initial state", "lower right", "Number of samples vs. return", "MDP_return")
 
 ### Improve over when the value function is known
+
+def compute_rewards(min_demand, max_demand, a, s, sale_price, purchase_cost):
+    rewards = []
+    for d in range(min_demand, max_demand+1):
+        #Compute the next inventory level
+        next_inventory = max(0, a + s - d);
+        
+        #Back calculate how many items were sold
+        sold_amount = d-next_inventory + a;
+        
+        #Compute the obtained revenue
+        revenue = sold_amount * sale_price;
+        
+        #Compute the expense
+        expense = a * purchase_cost;
+        
+        #Reward is equivalent to the profit & obtained from 
+        #revenue & total expense
+        reward = revenue - expense;
+
+        rewards.append((next_inventory,reward))
+    return rewards
+
 if __name__ == "__main__":
     #initially assign random value function to each state
     value_function = np.random.randint(10, size=(max_demand-min_demand+2))
-    print(len(value_function))
+    #print(len(value_function))
     tuple_size = 3 #s-a-th
 
-    num_samples = 10
+    num_samples = 5
     knownV_threshold = np.zeros((tuple_size, action_count))
-    knownV_nominal_points = {}
+    #knownV_nominal_points = {}
 
     X = []
     Y = []
 
     #this loop iterates incrementally with the latest value function 
     #to further improve upon
-    for i in tqdm.tqdm(range(5)):
-        print(knownV_threshold)
+    for i in tqdm.tqdm(range(50)):
+        
+        rmdp = crobust.MDP(0,0.9)
+        
+        #print(knownV_threshold)
         position=0
         for s in range(mdp.state_count()):
             actions = mdp.action_count(s)
             for a in range(actions):
 
+                if len(mdp.get_toids(s,a))==0:
+                    continue
+                
+                rewards = compute_rewards(min_demand, max_demand, a, s,\
+                 sale_price, purchase_cost)
+
                 #Computes the return, threshold, nominal point etc. for 
                 #current state & action
                 guk = evaluate_gaussian_knownV(num_samples, sa_confidence, runs, value_function, min_demand, max_demand, demand_mean_prior_mean, demand_mean_prior_std, true_demand_std)
-
-                if (s,a) not in knownV_nominal_points:
-                    knownV_nominal_points[(s,a)] = []
-
-                if len(knownV_nominal_points[(s,a)])>=2:
-                    #find the nominal point of all the nominal points
-                    nominalp_of_nominal = find_nominal_point(np.asarray\
-                                            (knownV_nominal_points[(s,a)]))
-                    uset, threshold = get_uset(np.asarray(knownV_nominal_points[(s,a)]), np.asarray(nominalp_of_nominal), len(knownV_nominal_points[(s,a)]))
-
-                    #Compute the distance between the current nominal point & 
-                    #the nominal point of all the previous nominal points
-                    dist = np.linalg.norm(guk[0][7] - nominalp_of_nominal, ord = 1)
-
-                    #if the new nominal point lies inside the previously
-                    #constructed l1-ball, a reasonable estimation is found 
-                    #& continue without updating the threshold for this 
-                    #state-action
-                    if dist<threshold:
-                        #print("dist<threshold",s,a,knownV_threshold[2,position])
-                        position+=1
-                        continue
 
                 #Stack state-action-threshold to pass to the mdp solver for 
                 #robust solution
                 knownV_threshold[0,position] = s
                 knownV_threshold[1,position] = a
-                knownV_threshold[2,position] = guk[0][2]
+                knownV_threshold[2,position] = guk[0][2] # threshold is 0
 
                 #print("KnownV_nomianl_point",guk[0][7])
-                knownV_nominal_points[(s,a)].append(guk[0][7])
+                #knownV_nominal_points[(s,a)].append(guk[0][7])
+                #mdp.set_probabilities(s,a,guk[0][7])
+                trp = guk[0][7]
+                #if s==0:
+                    #print(s,a,trp)
+                for k in range(len(rewards)):
+                    rmdp.add_transition(s, a, rewards[k][0], trp[k], rewards[k][1])
                 position+=1
+        
+        #print("MDP: ",rmdp.to_json())
 
-        sol = mdp.rsolve_vi("robust_l1".encode(),knownV_threshold)
+        sol = rmdp.rsolve_vi("robust_l1".encode(),knownV_threshold)
         vf = sol.valuefunction
         value_function = []
 
@@ -209,9 +240,35 @@ if __name__ == "__main__":
         X.append(i)
         Y.append(vf[0])
         print(i,"value_function",vf,value_function)
+###
     print(X,Y)
-    print("knownV_nominal_points",knownV_nominal_points[(0,0)][0])
+    #print("knownV_nominal_points",knownV_nominal_points[(0,0)][0])
     simple_generic_plot(X, Y, "Iteration over Value Function", "Return on the initial state", "lower right", "Number of interations vs. return", "MDP_return_1")
+
+
+###
+                if (s,a) not in knownV_nominal_points:
+                    knownV_nominal_points[(s,a)] = []
+
+                if len(knownV_nominal_points[(s,a)])>=2:
+                    #find the nominal point of all the nominal points
+                    nominalp_of_nominal = find_nominal_point(np.asarray\
+                                            (knownV_nominal_points[(s,a)]))
+                    #uset, threshold = get_uset(np.asarray(knownV_nominal_points[(s,a)]), np.asarray(nominalp_of_nominal), len(knownV_nominal_points[(s,a)]))
+
+                    #Compute the distance between the current nominal point & 
+                    #the nominal point of all the previous nominal points
+                    #dist = np.linalg.norm(guk[0][7] - nominalp_of_nominal, ord = 1)
+
+                    #if the new nominal point lies inside the previously
+                    #constructed l1-ball, a reasonable estimation is found 
+                    #& continue without updating the threshold for this 
+                    #state-action
+                    if dist<threshold:
+                        #print("dist<threshold",s,a,knownV_threshold[2,position])
+                        position+=1
+                        continue
+
 
 ### Invasive Species Simulation
 if __name__ == "__main__":
