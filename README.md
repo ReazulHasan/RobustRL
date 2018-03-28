@@ -16,11 +16,11 @@ Gurobi (http://www.gurobi.com/)
 
 ### Installing
 
-'''
-Follow the instructions in https://github.com/marekpetrik/CRAAM to in install CRAAM & the python interface of CRAAM.
-Install Gurobi from http://www.gurobi.com/
-Clone this repository. Run existing experiments from files Run_Experiments.py, Inventory_Optimization_Experiments.py.
-'''
+
+- Follow the instructions in https://github.com/marekpetrik/CRAAM to in install **CRAAM** & the **python interface of CRAAM**.
+- Install **Gurobi** from http://www.gurobi.com/
+- Clone this repository. Run existing experiments from files **Run_Experiments.py**, **Inventory_Optimization_Experiments.py**.
+
 
 <!---
 A step by step series of examples that tell you have to get a development env running
