@@ -8,9 +8,9 @@ import tqdm
 
 initial, max_inventory, purchase_cost, sale_price = 0, 50, 2.0, 3.0,
 prior_mean, prior_std, demand_std, rand_seed =  10.0, 5.0, 6.0, 3
-horizon, runs = 50, 1000
+horizon, runs = 5, 10
 discount_factor = 0.9
-num_samples = 20
+num_samples = 5
 
 ###Inventory Simulation
 if __name__ == "__main__":
@@ -61,7 +61,7 @@ if __name__ == "__main__":
     thresholds = [ [[] for _ in range(3)] for _ in range(Methods.NUM_METHODS.value) ]
     calc_return = [[] for _ in range(Methods.NUM_METHODS.value)]
 
-###
+### solve MDP
 if __name__ == "__main__":
     for pos, num_samples in enumerate(tqdm.tqdm(sample_steps)):
         for s in range(mdp.state_count()):
@@ -104,6 +104,35 @@ def compute_rewards(min_demand, max_demand, a, s, sale_price, purchase_cost):
         
         rewards.append((next_inventory,reward))
     return rewards
+    
+def construct_rmdp(position, value_functions, rmdp, is_multiple_v=False):
+    rewards = compute_rewards(min_demand, max_demand, a, s,\
+        sale_price, purchase_cost)
+
+    #Computes the return, threshold, nominal point etc. for 
+    #current state & action
+    guk = evaluate_gaussian_knownV(num_samples, sa_confidence, runs, value_functions, min_demand, max_demand, demand_mean_prior_mean, demand_mean_prior_std, true_demand_std)
+
+    #Stack state-action-threshold to pass to the mdp solver for robust solution
+    knownV_threshold[0,position] = s
+    knownV_threshold[1,position] = a
+    
+    trp = None
+    if is_multiple_v:
+        #Find the center of the L1 ball for the nominal points with different value functions
+        trp = find_nominal_point(guk[2])
+        
+        #Find the maximum distance from center of the L1 ball to the nominal points
+        #This is the size of the L1 ball, set it as threshold
+        knownV_threshold[2,position] = get_uset(guk[2], trp, len(guk[2]))[1]
+    else:
+        knownV_threshold[2,position] = guk[0] # threshold is 0    
+        trp = guk[2][0] #index 0 means there's only one value function
+
+    for k in range(len(rewards)):
+        rmdp.add_transition(s, a, rewards[k][0], trp[k], rewards[k][1])
+    position+=1
+    return rmdp
 
 ### Improve over when an initial value function is known
 if __name__ == "__main__":
@@ -111,6 +140,7 @@ if __name__ == "__main__":
     value_function = [np.random.randint(10, size=(max_demand-min_demand+2))]
     #print(len(value_function))
     tuple_size = 3 #s-a-th
+    is_multiple_v = False
 
     knownV_threshold = np.zeros((tuple_size, action_count))
     #knownV_nominal_points = {}
@@ -132,29 +162,9 @@ if __name__ == "__main__":
 
                 if len(mdp.get_toids(s,a))==0:
                     continue
-                
-                rewards = compute_rewards(min_demand, max_demand, a, s,\
-                 sale_price, purchase_cost)
-
-                #Computes the return, threshold, nominal point etc. for 
-                #current state & action
-                guk = evaluate_gaussian_knownV(num_samples, sa_confidence, runs, value_function, min_demand, max_demand, demand_mean_prior_mean, demand_mean_prior_std, true_demand_std)
-
-                #Stack state-action-threshold to pass to the mdp solver for 
-                #robust solution
-                knownV_threshold[0,position] = s
-                knownV_threshold[1,position] = a
-                knownV_threshold[2,position] = guk[0] # threshold is 0
-
-                #print("KnownV_nomianl_point",guk[0][7])
-                #knownV_nominal_points[(s,a)].append(guk[0][7])
-                #mdp.set_probabilities(s,a,guk[0][7])
-                trp = guk[2]
-                #if s==0:
-                    #print(s,a,trp)
-                for k in range(len(rewards)):
-                    rmdp.add_transition(s, a, rewards[k][0], trp[0,k], rewards[k][1])
-                position+=1
+                    
+                rmdp = construct_rmdp(position, value_function, rmdp, is_multiple_v) #pythonic way of passing by reference. modify inside outer function, return modified object & reassign.
+                position += 1
 
         #print("MDP: ",rmdp.to_json())
 
@@ -177,11 +187,12 @@ if __name__ == "__main__":
     #print("knownV_nominal_points",knownV_nominal_points[(0,0)][0])
     simple_generic_plot(X, Y, "Iteration over Value Function", "Return on the initial state", "lower right", "Number of interations vs. return", "MDP_return_1")
 
-### The case when we have multiple value functions
+### The case when we have multiple value functions & multiple state MDP
 if __name__ == "__main__":
     num_v = 20
     value_functions = []
     tuple_size = 3 #s-a-th
+    is_multiple_v = True
 
     knownV_threshold = np.zeros((tuple_size, action_count))
     #knownV_nominal_points = {}
@@ -195,9 +206,8 @@ if __name__ == "__main__":
         
         value_functions.append(np.random.randint(10, size=(max_demand-min_demand+2))) 
         rmdp = crobust.MDP(0, discount_factor)
-        
-        #print(knownV_threshold)
         position=0
+        
         for s in range(mdp.state_count()):
             actions = mdp.action_count(s)
             for a in range(actions):
@@ -205,28 +215,8 @@ if __name__ == "__main__":
                 if len(mdp.get_toids(s,a))==0:
                     continue
                 
-                rewards = compute_rewards(min_demand, max_demand, a, s,\
-                sale_price, purchase_cost)
-
-                #Computes the return, threshold, nominal point etc. for 
-                #current state & action
-                guk = evaluate_gaussian_knownV(num_samples, sa_confidence, runs, value_functions, min_demand, max_demand, demand_mean_prior_mean, demand_mean_prior_std, true_demand_std)
-
-                #Stack state-action-threshold to pass to the mdp solver for 
-                #robust solution
-                knownV_threshold[0,position] = s
-                knownV_threshold[1,position] = a
-                knownV_threshold[2,position] = 0 #guk[0,i] # threshold is 0
-                
-                #print(guk[2])
-                nominalp_of_nominal = find_nominal_point(guk[2])
-                
-                trp = nominalp_of_nominal #guk[2]
-
-                for k in range(len(rewards)):
-                    rmdp.add_transition(s, a, rewards[k][0], trp[k], rewards[k][1])
-                position+=1
-
+                rmdp = construct_rmdp(position, value_functions, rmdp, is_multiple_v) #pythonic way of passing by reference. modify inside outer function, return modified object & reassign.
+                position += 1
         #print("MDP: ",rmdp.to_json())
 
         sol = rmdp.rsolve_vi("robust_l1".encode(),knownV_threshold)
@@ -271,3 +261,20 @@ simple_generic_plot(X, Y, "Number of Value Functions", "Return on the initial st
                         #print("dist<threshold",s,a,knownV_threshold[2,position])
                         position+=1
                         continue
+                       
+                       
+                        
+                rewards = compute_rewards(min_demand, max_demand, a, s,\
+                sale_price, purchase_cost)
+
+                #Computes the return, threshold, nominal point etc. for 
+                #current state & action
+                guk = evaluate_gaussian_knownV(num_samples, sa_confidence, runs, value_functions, min_demand, max_demand, demand_mean_prior_mean, demand_mean_prior_std, true_demand_std)
+                
+                #print(guk[2])
+                nominalp_of_nominal = find_nominal_point(guk[2])
+                trp = nominalp_of_nominal #guk[2]
+
+
+                for k in range(len(rewards)):
+                    rmdp.add_transition(s, a, rewards[k][0], trp[k], rewards[k][1])
