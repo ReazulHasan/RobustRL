@@ -87,6 +87,18 @@ def evaluate_gaussian_uncertainty(num_samples, confidence_level, num_simulation,
     knownV_ret = np.zeros(num_simulation)
     knownV_ret_err = np.zeros(num_simulation)
     
+    num_v = len(value_functions)
+    
+    improveV_th = np.zeros((num_v, num_simulation))
+    improveV_ret = np.zeros(num_simulation)
+    improveV_ret_err = np.zeros(num_simulation)
+    
+    addRandomV_th = np.zeros((num_v, num_simulation))
+    addRandomV_ret = np.zeros(num_simulation)
+    addRandomV_ret_err = np.zeros(num_simulation)
+    
+    KnownV_nomianl_point = [ [] for _ in range(num_v)]#np.zeros(num_simulation)
+    
     # number of samples of the true distribution to take when estimatng the Bayes samples
     bayes_samples = 25
 

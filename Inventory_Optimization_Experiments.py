@@ -134,7 +134,26 @@ def construct_rmdp(position, value_functions, rmdp, is_multiple_v=False):
     position+=1
     return rmdp
 
-### Improve over when an initial value function is known
+### Improve over when an initial value function is known for one single state-action
+if __name__ == "__main__":
+    #initially assign random value function to each state
+    value_function = [np.random.randint(10, size=(max_demand-min_demand+2))]
+    #print(len(value_function))
+    tuple_size = 3 #s-a-th
+    is_multiple_v = False
+
+    knownV_threshold = np.zeros((tuple_size, action_count))
+    #knownV_nominal_points = {}
+
+    X = []
+    Y = []
+
+    #this loop iterates incrementally with the latest value function 
+    #to further improve upon
+    for i in tqdm.tqdm(range(5)):
+        pass
+
+### Improve over when an initial value function is known for MDP
 if __name__ == "__main__":
     #initially assign random value function to each state
     value_function = [np.random.randint(10, size=(max_demand-min_demand+2))]
