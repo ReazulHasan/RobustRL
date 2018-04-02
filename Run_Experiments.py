@@ -52,31 +52,31 @@ if __name__ == "__main__":
 ### Run Gaussian Experiments
 if __name__ == "__main__":
     # number of sampling steps
-    num_iterations = 3
+    num_iterations = 10
     # the desired confidence level
     confidence_level = 0.90
     # number of runs
-    runs = 3
+    runs = 10
     min_demand, max_demand = 0, 100
     demand_mean_prior_mean, demand_mean_prior_std, true_demand_std = 50, 15, 25
 
-    sample_step = 3
+    sample_step = 5
 
     gauss_results = []
-    value_function = np.random.randint(10, size=(max_demand-min_demand+1))
-    #print("value_function",value_function)
+    value_function = np.random.uniform(low=0, high=10, size=(max_demand-min_demand+1))
+    print("value_function",value_function)
+    
     sample_steps = np.arange(sample_step,sample_step*num_iterations+1, step = sample_step)
     
     for pos, i in enumerate(tqdm.tqdm(sample_steps)):
-        gauss_results.append(evaluate_gaussian_uncertainty(i, confidence_level, runs, value_function, min_demand, max_demand))
+        gauss_results.append(evaluate_gaussian_uncertainty(i, confidence_level, runs, value_function, value_function, [value_function], min_demand, max_demand))
     
 ### Plot Gaussian Results
 if __name__ == "__main__":
-    plot_returns(gauss_results, sample_steps, [Methods.BAYES, Methods.HOEFF, Methods.HOEFFTIGHT], "gaussian_return_bayes_hoeff_tight.pdf", runs)
-    plot_thresholds(gauss_results, sample_steps, [Methods.HOEFF, Methods.HOEFFTIGHT],"gaussian_threhold_hoeff_vs_tight.pdf", runs)
-    plot_violations(gauss_results, sample_steps, [Methods.HOEFF, Methods.HOEFFTIGHT, Methods.KNOWNV],"gaussian_violations_hoeff_vs_tight.pdf")
-    
-
+    compare_methods = [Methods.BAYES, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.KNOWNV, Methods.IMPROVEV, Methods.ADDRANDOMV]
+    plot_returns(gauss_results, sample_steps, compare_methods, "gaussian_return_single_state.pdf", runs)
+    #plot_thresholds(gauss_results, sample_steps, [Methods.HOEFF, Methods.HOEFFTIGHT],"gaussian_threhold_hoeff_vs_tight.pdf", runs)
+    #plot_violations(gauss_results, sample_steps, [Methods.HOEFF, Methods.HOEFFTIGHT, Methods.KNOWNV],"gaussian_violations_hoeff_vs_tight.pdf")
 
 
 ### Invasive Species Simulation

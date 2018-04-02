@@ -7,7 +7,11 @@ font = {'weight' : 'normal',
 
 plt.rc('font', **font)
 
-LI_COLORS = ['b','c','r','g','m']
+LI_COLORS = ['black','c','r','m','g','b','violet']
+lineStyles = ['--', '-.', ':']
+#markers = ['D', '^', '8', 's', 'p', 'v', '.', 'x']
+markers = ['s','<', '^', '>', 'v', '.']
+
 STD_95 = 1.96
 fig_height, fig_width = 14, 8
 
@@ -20,10 +24,11 @@ def plot_returns(results_dir, sample_steps, compare_methods, figure_name="Return
         if method_name not in compare_methods:
             continue
         mean = np.array([r[method_index][1] for r in results_dir])
-        sigma = np.array([r[method_index][5] for r in results_dir])
+        print("np.sqrt(sample_steps)",np.sqrt(sample_steps))
+        sigma = np.array([r[method_index][5] for r in results_dir]) / np.sqrt(sample_steps)
         #print(mean, sigma, mean + 1.96 * sigma)
-        plt.plot(sample_steps, mean, '+-', label = method_name.value, color=LI_COLORS[method_index])
-        plt.fill_between(sample_steps, mean - STD_95 * sigma / math.sqrt(runs), mean + STD_95 * sigma / math.sqrt(runs), alpha=0.2, color=LI_COLORS[method_index])
+        plt.plot(sample_steps, mean, linestyle=lineStyles[method_index%3], marker=markers[method_index%5], alpha=0.7, label = method_name.value, color=LI_COLORS[method_index])
+        plt.fill_between(sample_steps, mean - STD_95 * sigma, mean + STD_95 * sigma, alpha=0.2, color=LI_COLORS[method_index])
 
     plt.xlabel('Number of samples'+r'$(N)$')
     plt.ylabel('Calculated return error: '+r'$\rho^* - \rho(\xi)$')
@@ -43,9 +48,9 @@ def plot_thresholds(results_dir, sample_steps, compare_methods, figure_name="Thr
         if method_name not in compare_methods:
             continue
         mean = np.array([r[method_index][2] for r in results_dir])
-        sigma = np.array([r[method_index][6] for r in results_dir])
+        sigma = np.array([r[method_index][6] for r in results_dir]) / np.sqrt(len(sample_steps))
         plt.plot(sample_steps, [r[method_index][2] for r in results_dir], '+-', label = method_name.value, color=LI_COLORS[method_index])
-        plt.fill_between(sample_steps, mean - STD_95 * sigma / math.sqrt(runs), mean + STD_95 * sigma / math.sqrt(runs), alpha=0.3, color=LI_COLORS[method_index])
+        plt.fill_between(sample_steps, mean - STD_95 * sigma, mean + STD_95 * sigma, alpha=0.3, color=LI_COLORS[method_index])
     
     plt.xlabel('number of samples'+r'$(N)$')
     plt.ylabel(r'$L_1$'+' threshold')
@@ -78,8 +83,10 @@ def plot_violations(results_dir, sample_steps, compare_methods, figure_name="Vio
 # The generic method to plot data. First param is the x axis, second is a list of y axis data
 def generic_plot(X, Data, x_lab="x axis", y_lab="y axis", legend_pos="upper right", plot_title = "", figure_name="Generic_Plot.pdf"):
     plt.figure(num=1, figsize=(fig_height, fig_width), dpi=80, facecolor='w', edgecolor='k')
-    for index in range(Methods.NUM_METHODS.value):
-        plt.plot(X, Data[index], '+-', label = LI_METHODS[index].value)
+    for method_index in range(Methods.NUM_METHODS.value):
+        if LI_METHODS[method_index] is Methods.EM:
+            continue
+        plt.plot(X, Data[method_index], linestyle=lineStyles[method_index%3], marker=markers[method_index%5], alpha=0.7, label = LI_METHODS[method_index].value)
 
     plt.xlabel(x_lab)
     plt.ylabel(y_lab)

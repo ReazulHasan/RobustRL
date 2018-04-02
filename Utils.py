@@ -13,10 +13,13 @@ if __name__ == "__main__":
         HOEFFTIGHT = "Hoeffding Tight"
         EM = "Expectation Maximization"
         KNOWNV = "Known Value Function"
+        IMPROVEV = "Iteratively Improve Value Function"
+        ADDRANDOMV = "Iteratively Add Random Value Function"
         
-        NUM_METHODS = 5 #Number of methods
+        NUM_METHODS = 7 #Number of methods
     
-    LI_METHODS = [Methods.BAYES, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.EM, Methods.KNOWNV]
+    LI_METHODS = [Methods.BAYES, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.EM,\
+                Methods.KNOWNV, Methods.IMPROVEV, Methods.ADDRANDOMV]
 
 ### Apply Linear Program to compute the nominal point & apply quick select to find the uncertainty set with the required confidence
 def get_uset(points, nominal_point, conf_rank):
