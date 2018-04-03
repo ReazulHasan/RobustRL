@@ -42,8 +42,8 @@ def normal_aposteriori(values, weights, std, prior_mean, prior_std):
 print(discretize_gaussian(0, 10, 3, 2))
 
 ### construct & evaluate uncertainty with Gaussian distributed data points. Calculate L1 worstcase return
-def evaluate_gaussian_uncertainty(num_samples, confidence_level, num_simulation, known_ValueFunction, improve_ValueFunction, addRandom_ValueFunction, min_demand = 0,\
-                        max_demand = 100, demand_mean_prior_mean = 50, demand_mean_prior_std = 15, true_demand_std = 25):
+def evaluate_gaussian_uncertainty(num_samples, confidence_level, num_simulation, known_ValueFunction, improve_ValueFunction, addRandom_ValueFunction, min_demand,\
+                        max_demand, demand_mean_prior_mean = 50, demand_mean_prior_std = 15, true_demand_std = 25):
     """
     Runs the evaluation assuming that the next state represents a demand level
     and that it is distributed according to a normal distribution. The prior on
@@ -61,11 +61,11 @@ def evaluate_gaussian_uncertainty(num_samples, confidence_level, num_simulation,
     @return bayes_return, bayes_threshold, hoeffding_return, hoeffding_threshold
     """     
     
-    demand_values = np.arange(min_demand, max_demand + 1, dtype=np.double)
+    demand_values = np.arange(min_demand, max_demand + 2, dtype=np.double)
     # number of next steps depends on the demands
-    num_next_states = max_demand - min_demand + 1
+    num_next_states = max_demand - min_demand + 2
     # rewards - an increasing sequence
-    reward = np.arange(min_demand, max_demand + 1, dtype=np.double)
+    reward = np.arange(min_demand, max_demand + 2, dtype=np.double)
     
     bayes_th = np.zeros(num_simulation)
     bayes_ret = np.zeros(num_simulation)
@@ -105,13 +105,15 @@ def evaluate_gaussian_uncertainty(num_samples, confidence_level, num_simulation,
     
     # number of samples of the true distribution to take when estimatng the Bayes samples
     bayes_samples = 25
+    
+    accumulate_dir_points = []
 
     for i in range(num_simulation):
         # construct the true distribution
         true_demand_mean = np.random.normal(demand_mean_prior_mean, demand_mean_prior_std)
 
         # construct the true distribution
-        true_distribution = discretize_gaussian(min_demand, max_demand, true_demand_mean, true_demand_std)
+        true_distribution = discretize_gaussian(min_demand, max_demand+1, true_demand_mean, true_demand_std)
 
         # get samples from multinomial distribution, 3 next states with uniform transition kernel
         mult = np.random.multinomial(num_samples, true_distribution)
@@ -124,10 +126,11 @@ def evaluate_gaussian_uncertainty(num_samples, confidence_level, num_simulation,
                                     true_demand_std, demand_mean_prior_mean, demand_mean_prior_std)
 
         dir_points = np.array(\
-            [discretize_gaussian(min_demand, max_demand, 
+            [discretize_gaussian(min_demand, max_demand+1, 
                     np.random.normal(estmean_demand_mean, estmean_demand_std), true_demand_std) \
                     for k in range(bayes_samples)])
-
+        
+        accumulate_dir_points.append(dir_points)
         #print("Gaussian: ",min_demand, max_demand, dir_points[0])
 
         # calc mean probability p_hat 
@@ -199,7 +202,7 @@ def evaluate_gaussian_uncertainty(num_samples, confidence_level, num_simulation,
             (Methods.EM, np.mean(np.maximum(0,em_ret_err)), np.mean(em_th), np.mean(em_ret_err < 0), np.mean(em_ret), np.std(np.maximum(0,em_ret_err)), np.std(em_th), em_nominal ),\
             (Methods.KNOWNV, np.mean(np.maximum(0,knownV_ret_err)), np.mean(knownV_th), np.mean(knownV_ret_err<0), np.mean(knownV_ret), np.std(np.maximum(0,knownV_ret_err)), np.std(knownV_th), np.mean(knownV_nominalPoints,axis=0)),\
             (Methods.IMPROVEV, np.mean(np.maximum(0,improveV_ret_err)), np.mean(improveV_th), np.mean(improveV_ret_err<0), np.mean(improveV_ret), np.std(np.maximum(0,improveV_ret_err)), np.std(improveV_th), np.mean(improveV_nominalPoints,axis=0)),\
-            (Methods.ADDRANDOMV, np.mean(np.maximum(0,addRandomV_ret_err)), np.mean(addRandomV_th, axis=1), np.mean(addRandomV_ret_err<0), np.mean(addRandomV_ret, axis=1), np.std(np.maximum(0,addRandomV_ret_err)), np.std(addRandomV_th,axis=1), np.mean(addRandomV_nomianlPoints,axis=1))]
+            (Methods.ADDRANDOMV, np.mean(np.maximum(0,addRandomV_ret_err)), np.mean(addRandomV_th, axis=1), np.mean(addRandomV_ret_err<0), np.mean(addRandomV_ret, axis=1), np.std(np.maximum(0,addRandomV_ret_err)), np.std(addRandomV_th,axis=1), np.mean(addRandomV_nomianlPoints,axis=1))], np.mean(accumulate_dir_points, axis=0)
 
 
 ### construct & evaluate uncertainty with Gaussian Distribution & Known Value Function
@@ -222,13 +225,9 @@ def evaluate_gaussian_knownV(num_samples, confidence_level, num_simulation, valu
     """     
     
     demand_values = np.arange(min_demand, max_demand + 2, dtype=np.double)
-    # number of next steps depends on the demands
-    num_next_states = max_demand - min_demand + 2
-    # rewards - an increasing sequence
-    reward = np.arange(min_demand, max_demand + 2, dtype=np.double)
     
     # number of samples of the true distribution to take when estimatng the Bayes samples
-    bayes_samples = 50
+    bayes_samples = 25
     num_v = len(value_functions)
     
     knownV_th = np.zeros((num_v, num_simulation))
@@ -266,6 +265,27 @@ def evaluate_gaussian_knownV(num_samples, confidence_level, num_simulation, valu
             
     return (np.mean(knownV_th,axis=1), np.std(knownV_th,axis=1), np.mean(KnownV_nomianl_point,axis=1))
 
+def evaluate_gaussian_knownV(dir_points, confidence_level, value_functions):
+    """
+    Runs the evaluation assuming that the next state represents a demand level
+    and that it is distributed according to a normal distribution, & the value function for the next states is known. The prior on
+    the mean of this distribution is also Gaussian, and the standard deviation is known.
+    @param confidence_level required confidence level
+
+    @return KnownV paramters
+    """
+    knownV_th = []#np.zeros((num_v, num_simulation))
+    KnownV_nomianl_point = []#[ [] for _ in range(num_v)]
+    
+    for vi, value_function in enumerate(value_functions):
+        knownV = construct_uset_known_value_function(dir_points, value_function,\
+        confidence_level)
+        
+        knownV_th.append(knownV[1])
+        
+        KnownV_nomianl_point.append(knownV[2])
+            
+    return knownV_th, KnownV_nomianl_point
 ###
 x = np.zeros((2,3))
 print(np.mean(x, axis=1))

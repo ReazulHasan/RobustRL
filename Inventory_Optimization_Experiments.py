@@ -6,7 +6,7 @@ import Plot
 import numpy as np
 import tqdm
 
-initial, max_inventory, purchase_cost, sale_price = 0, 30, 2.0, 3.0,
+initial, max_inventory, purchase_cost, sale_price = 0, 30, 2.0, 3.0
 prior_mean, prior_std, demand_std, rand_seed =  5.0, 2.0, 3, 3
 num_iterations_for_vf = 10
 horizon, runs = 20, 30
@@ -48,27 +48,23 @@ if __name__ == "__main__":
     demand_mean_prior_mean = np.mean(demands)
     demand_mean_prior_std = np.std(demands)
     true_demand_std = demand_std
-
-### solve MDP
-if __name__ == "__main__":
-    for pos, num_samples in enumerate(tqdm.tqdm(sample_steps)):
-        for s in range(mdp.state_count()):
-            actions = mdp.action_count(s)
-            for a in range(actions):
-                gu = evaluate_gaussian_uncertainty(num_samples, sa_confidence, runs, value_function, min_demand, max_demand,\
-                                    demand_mean_prior_mean, demand_mean_prior_std, true_demand_std)
-                for m in range(Methods.NUM_METHODS.value):
-                    thresholds[m][0].append(s)
-                    thresholds[m][1].append(a)
-                    thresholds[m][2].append(gu[m][2])
-
-        for m in range(Methods.NUM_METHODS.value):
-            sol = mdp.rsolve_vi("robust_l1".encode(),thresholds[m])
-            calc_return[m].append(sol.valuefunction[0])
-            print(LI_METHODS[m].value,sol.valuefunction)
-
-### Plot inventory simulation
-generic_plot(sample_steps, calc_return, "Number of samples", "Return on the initial state", "lower right", "Number of samples vs. return", "MDP_return")
+    
+    orig_sol = mdp.solve_vi()
+    print("Policy:",orig_sol)
+    
+    init = [0.0 for _ in range(mdp.state_count())]#np.zeros((mdp.state_count(),1))
+    init[0] = 1.0
+    print(init)
+    occ = mdp.occfreq_mat(np.asarray(init), discount_factor, orig_sol.policy)
+    ret = mdp.rewards_vec(orig_sol.policy)
+    print("Occ",occ,"Return",ret)
+    
+    initial_value_function = []
+    initial_value_function.append(ret[0])
+    for s in range(max_demand+1,0,-1):
+        initial_value_function.append(ret[-s])
+    
+    print("initial_value_function",initial_value_function)
 
 ### Compute the reward for inventory problem
 def compute_rewards(min_demand, max_demand, a, s, sale_price, purchase_cost):
@@ -92,14 +88,15 @@ def compute_rewards(min_demand, max_demand, a, s, sale_price, purchase_cost):
         
         rewards.append((next_inventory,reward))
     return rewards
-    
-def construct_rmdp(s, a, value_functions, rmdp, is_multiple_v=False):
+
+"""
+def construct_rmdp(s, a, value_functions, rmdp, dir_points, is_multiple_v=False):
     rewards = compute_rewards(min_demand, max_demand, a, s,\
         sale_price, purchase_cost)
 
     #Computes the return, threshold, nominal point etc. for 
     #current state & action
-    guk = evaluate_gaussian_knownV(num_samples, sa_confidence, runs, value_functions, min_demand, max_demand, demand_mean_prior_mean, demand_mean_prior_std, true_demand_std)
+    guk = evaluate_gaussian_knownV(num_samples, sa_confidence, runs, value_functions, min_demand, max_demand, demand_mean_prior_mean, demand_mean_prior_std, true_demand_std, dir_points)
     
     trp = None
     th = 0
@@ -117,10 +114,38 @@ def construct_rmdp(s, a, value_functions, rmdp, is_multiple_v=False):
     for k in range(len(rewards)):
         rmdp.add_transition(s, a, rewards[k][0], trp[k], rewards[k][1])
 
-    return rmdp, th
+    return th
+"""
+
+def construct_rmdp(s, a, value_functions, rmdp, dir_points, is_multiple_v=False):
+    rewards = compute_rewards(min_demand, max_demand, a, s,\
+        sale_price, purchase_cost)
+
+    #Computes the return, threshold, nominal point etc. for 
+    #current state & action
+    guk = evaluate_gaussian_knownV(dir_points, sa_confidence, value_functions)
+    # evaluate_gaussian_knownV(num_samples, sa_confidence, runs, value_functions, min_demand, max_demand, demand_mean_prior_mean, demand_mean_prior_std, true_demand_std, dir_points)
+    
+    trp = None
+    th = 0
+    if is_multiple_v:
+        #Find the center of the L1 ball for the nominal points with different value functions
+        trp = find_nominal_point(guk[1])
+        
+        #Find the maximum distance from center of the L1 ball to the nominal points
+        #This is the size of the L1 ball, set it as threshold
+        th = get_uset(guk[1], trp, len(guk[1]))[1]
+    else:
+        th = guk[0] # threshold is 0    
+        trp = guk[2][0] #index 0 means there's only one value function
+
+    for k in range(len(rewards)):
+        rmdp.add_transition(s, a, rewards[k][0], trp[k], rewards[k][1])
+
+    return th
 
 ### Iteratively improve over when an initial value function is known
-def incrementally_improve_V(vf, threshold):
+def incrementally_improve_V(vf, threshold, dir_points):
     is_multiple_v = False
 
     value_functions = [[]]
@@ -147,7 +172,8 @@ def incrementally_improve_V(vf, threshold):
                 threshold[0,pos] = s
                 threshold[1,pos] = a
                 
-                rmdp, threshold[2,pos] = construct_rmdp(s, a, value_functions, rmdp, is_multiple_v) #pythonic way of passing by reference. modify inside outer function, return modified object & reassign.
+                threshold[2,pos] = construct_rmdp(s, a, value_functions, rmdp, dir_points, is_multiple_v) 
+                
                 pos += 1
 
         #print("MDP: ",rmdp.to_json())
@@ -166,24 +192,24 @@ def incrementally_improve_V(vf, threshold):
     return value_functions[0][0] #initial states value of 0th value function
 
 ### Improve with random new value functions
-def randomly_improve_V(vf, threshold):
+def randomly_improve_V(vf, threshold, dir_points):
     is_multiple_v = True
 
     value_functions = [[]]
     value_functions[0].append(vf[0])
-    for v in range(max_demand+1,0,-1):
-        value_functions[0].append(vf[-v])
+    for s in range(max_demand+1,0,-1):
+        value_functions[0].append(vf[-s])
 
     #this loop iterates incrementally with the latest value function 
     #to further improve upon
-    for i in range(num_iterations_for_vf):
+    for i in range(1,num_iterations_for_vf+1,1):
         #print("random vf",value_functions)
         
         #threshold is set to zero & will be zero finally because construct_uset_known_value_function\
         #picks the robust value with threshold zero
         threshold = np.zeros((tuple_size, action_count))
     
-        value_functions.append(np.random.randint(10, size=(max_demand-min_demand+2))) 
+        #value_functions.append(np.random.randint(10, size=(max_demand-min_demand+2))) 
         rmdp = crobust.MDP(0, discount_factor)
         pos=0
         
@@ -195,39 +221,32 @@ def randomly_improve_V(vf, threshold):
                     continue
                 threshold[0,pos] = s
                 threshold[1,pos] = a
-                rmdp, threshold[2,pos] = construct_rmdp(s, a, value_functions, rmdp, is_multiple_v) #pythonic way of passing by reference. modify inside outer function, return modified object & reassign.
+                threshold[2,pos] = construct_rmdp(s, a, value_functions, rmdp, dir_points, is_multiple_v) 
                 pos += 1
         #print("MDP: ",rmdp.to_json())
 
         sol = rmdp.rsolve_vi("robust_l1".encode(),threshold)
         vf = sol.valuefunction
         
+        value_functions[i].append(vf[0])
+        for s in range(max_demand+1,0,-1):
+            value_functions[i].append(vf[-s])
+        
     return vf[0]
-    
-###
-        value_function = []
-
-        #As S,s policy is used as random policy to generate samples, 
-        #the possible inventory levels are, o & (max_inventory - max_demand) 
-        #to max_inventory, inclusive. So filter out the value functions
-        #for possible states.
-        value_function.append(vf[0])
-        for v in range(max_demand+1,0,-1):
-            value_function.append(vf[-v])
 
 ### Compare methods for MDP with multiple states & actions
 if __name__ == "__main__":
     # number of sampling steps
-    num_iterations = 30
+    num_iterations = 5
     # number of runs
-    runs = 20
-    sample_step = 5
+    runs = 5
+    sample_step = 2
 
     gauss_results = []
-    known_ValueFunction = np.random.uniform(low=0, high=10, size=(max_demand-min_demand+1))
-    improve_ValueFunction, addRandom_ValueFunction = known_ValueFunction, [known_ValueFunction]
+    #initial_value_function = np.random.uniform(low=0, high=10, size=(max_demand-min_demand+1))
+    improve_ValueFunction, addRandom_ValueFunction = initial_value_function, [initial_value_function]
     
-    print("known_ValueFunction",known_ValueFunction)
+    print("initial_value_function",initial_value_function)
     
     sample_steps = np.arange(sample_step,sample_step*num_iterations+1, step = sample_step)
     
@@ -249,8 +268,8 @@ if __name__ == "__main__":
                 
                 rewards = compute_rewards(min_demand, max_demand, a, s, sale_price, purchase_cost)
                 
-                gu = evaluate_gaussian_uncertainty(num_samples, sa_confidence, runs,\
-                known_ValueFunction, improve_ValueFunction, addRandom_ValueFunction,\
+                gu, dir_points = evaluate_gaussian_uncertainty(num_samples, sa_confidence, runs,\
+                np.asarray(initial_value_function), improve_ValueFunction, addRandom_ValueFunction,\
                 min_demand, max_demand, demand_mean_prior_mean, demand_mean_prior_std,\
                 true_demand_std)
                 
@@ -273,9 +292,9 @@ if __name__ == "__main__":
             sol = rmdps[m].rsolve_vi("robust_l1".encode(),np.asarray(thresholds[m]))
             #print(sol.valuefunction)
             if LI_METHODS[m] is Methods.IMPROVEV:
-                calc_return[m].append(incrementally_improve_V(sol.valuefunction,thresholds[m]))
+                calc_return[m].append(incrementally_improve_V(sol.valuefunction,thresholds[m], dir_points))
             elif LI_METHODS[m] is Methods.ADDRANDOMV:
-                calc_return[m].append(randomly_improve_V(sol.valuefunction,thresholds[m]))
+                calc_return[m].append(randomly_improve_V(sol.valuefunction,thresholds[m], dir_points))
             else:
                 calc_return[m].append(sol.valuefunction[0])
             #print(LI_METHODS[m].value,sol.valuefunction)

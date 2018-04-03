@@ -52,15 +52,15 @@ if __name__ == "__main__":
 ### Run Gaussian Experiments
 if __name__ == "__main__":
     # number of sampling steps
-    num_iterations = 10
+    num_iterations = 5
     # the desired confidence level
     confidence_level = 0.90
     # number of runs
-    runs = 10
+    runs = 5
     min_demand, max_demand = 0, 100
     demand_mean_prior_mean, demand_mean_prior_std, true_demand_std = 50, 15, 25
 
-    sample_step = 5
+    sample_step = 2
 
     gauss_results = []
     value_function = np.random.uniform(low=0, high=10, size=(max_demand-min_demand+1))
