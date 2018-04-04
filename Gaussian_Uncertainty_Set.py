@@ -104,7 +104,7 @@ def evaluate_gaussian_uncertainty(num_samples, confidence_level, num_simulation,
     addRandomV_nomianlPoints = [ [] for _ in range(num_v)]
     
     # number of samples of the true distribution to take when estimatng the Bayes samples
-    bayes_samples = 25
+    bayes_samples = 10
     
     accumulate_dir_points = []
 
@@ -227,7 +227,7 @@ def evaluate_gaussian_knownV(num_samples, confidence_level, num_simulation, valu
     demand_values = np.arange(min_demand, max_demand + 2, dtype=np.double)
     
     # number of samples of the true distribution to take when estimatng the Bayes samples
-    bayes_samples = 25
+    bayes_samples = 15
     num_v = len(value_functions)
     
     knownV_th = np.zeros((num_v, num_simulation))
@@ -265,7 +265,7 @@ def evaluate_gaussian_knownV(num_samples, confidence_level, num_simulation, valu
             
     return (np.mean(knownV_th,axis=1), np.std(knownV_th,axis=1), np.mean(KnownV_nomianl_point,axis=1))
 
-def evaluate_gaussian_knownV(dir_points, confidence_level, value_functions):
+def evaluate_gaussian_knownV_reuseSamples(dir_points, confidence_level, value_functions):
     """
     Runs the evaluation assuming that the next state represents a demand level
     and that it is distributed according to a normal distribution, & the value function for the next states is known. The prior on
