@@ -39,6 +39,7 @@ if __name__ == "__main__":
     
     random_policy = np.random.randint(2, size=(carrying_capacity-min_population+1))
     arbitrary_valuefunction = mdp.rewards_vec(random_policy)
+    #print(arbitrary_valuefunction)
 
 ### Construct uncertainty set for each state-action
 
@@ -46,12 +47,12 @@ def get_transition_reward(current_population, horizon, num_samples, seed):
     transitions_points = [[] for _ in range(num_actions)]
     rewards = np.zeros((num_actions, carrying_capacity-min_population+1))
     
-    for _ in range(num_samples):
+    for i in range(num_samples):
         transitions = np.zeros((num_actions, carrying_capacity-min_population+1))
 
         species_simulator = crobust.SimulatorSpecies(current_population, carrying_capacity,\
                     mean_growth_rate, std_growth_rate, std_observation, beta_1, beta_2, n_hat,\
-                    threshold_control, prob_control, seed)
+                    threshold_control, prob_control, i*seed)
         samples = species_simulator.simulate_species(horizon, num_runs)
         
         count = np.zeros((num_actions))
@@ -145,6 +146,100 @@ def evaluate_uncertainty_set(current_population, num_samples, num_simulation, va
 
 #print(evaluate_uncertainty_set(5, 5, 5, arbitrary_valuefunction, 0.9))
 
+###
+def incrementally_replace_V(valuefunction, num_samples, num_simulation,\
+                                                        num_update, sa_confidence):
+    horizon = 1
+    X = []
+    Y = []
+    for i in range(num_update):
+        threshold = [[] for _ in range(3)]
+        rmdp = crobust.MDP(0, discount_factor)
+        for s in population:
+            transitions_points, rewards = get_transition_reward(s, horizon,\
+                                                        num_samples, i)
+            for a in range(num_actions):
+                dir_points = np.asarray(transitions_points[a])
+                res = construct_uset_known_value_function(dir_points, valuefunction,\
+                                                            confidence)
+                
+                threshold[0].append(s)
+                threshold[1].append(a)
+                threshold[2].append(res[1])
+                
+                trp = res[2]
+                
+                for next_st in population:
+                    rmdp.add_transition(s, a, next_st, trp[int(next_st)],\
+                                            rewards[a,int(next_st)])
+                
+        sol = rmdp.rsolve_vi("robust_l1".encode(),threshold)
+        valuefunction = sol.valuefunction
+        X.append(i)
+        Y.append(valuefunction[0])
+    print(X, Y)
+    simple_generic_plot(X, Y, "Number of samples", "Returned value to initial state")
+
+incrementally_replace_V(arbitrary_valuefunction, 5, 5, 5, 0.9)
+
+###
+def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
+                                                        num_update, sa_confidence):
+    horizon = 1
+    X = []
+    Y = []
+    
+    valuefunctions = [valuefunctions]
+    th_list = []
+    list_transitions_points, list_rewards = {}, {}
+    for s in population:
+        transitions_points, rewards = get_transition_reward(s, horizon,\
+                                        num_samples, np.random.randint(len(population)))
+        list_transitions_points[s] = transitions_points
+        list_rewards[s] = rewards
+        
+    for i in range(num_update):
+        #print("valuefunctions",i,": ",valuefunctions)
+        threshold = [[] for _ in range(3)]
+        rmdp = crobust.MDP(0, discount_factor)
+        for s in population:
+            transitions_points, rewards = list_transitions_points[s], list_rewards[s]
+            #get_transition_reward(s, horizon, num_samples, i)
+            for a in range(num_actions):
+                dir_points = np.asarray(transitions_points[a])
+                
+                nomianl_points = []
+    
+                for valuefunction in valuefunctions:
+                    res = construct_uset_known_value_function(dir_points, valuefunction,\
+                                                            confidence)
+                    nomianl_points.append(res[2])
+                
+                #Find the center of the L1 ball for the nominal points with different 
+                #value functions
+                trp, th = find_nominal_point(np.asarray(nomianl_points))
+                
+                if s==0 and a==1:
+                    th_list.append(th)
+                
+                threshold[0].append(s)
+                threshold[1].append(a)
+                threshold[2].append(th)
+                
+                for next_st in population:
+                    rmdp.add_transition(s, a, next_st, trp[int(next_st)],\
+                                            rewards[a,int(next_st)])
+                
+        sol = rmdp.rsolve_vi("robust_l1".encode(),threshold)
+        valuefunction = sol.valuefunction
+        valuefunctions.append(valuefunction)
+        X.append(i)
+        Y.append(valuefunction[0])
+    #print(X, Y)
+    print(th_list)
+    simple_generic_plot(X, Y, "Number of samples", "Returned value to initial state")
+
+incrementally_add_V(arbitrary_valuefunction, 30, 10, 10, 0.9)
 ### run experiments
 if __name__ == "__main__":
     # number of sampling steps
@@ -153,6 +248,13 @@ if __name__ == "__main__":
     num_simulation = 5
     sample_step = 2
     confidence_level = 0.9
+    
+    #max number of iterations to improve value functions
+    num_update = 5
+    
+    #(1-overall_confidence) is the total violation allowed. This total violation is distributed among all the state action pairs
+    # according to the Union bound.
+    sa_confidence = 1 - ((1 - confidence_level) / action_count)
     
     sample_steps = np.arange(sample_step,sample_step*num_iterations+1, step = sample_step)
     
@@ -167,7 +269,7 @@ if __name__ == "__main__":
             rmdps.append(crobust.MDP(0, discount_factor))
         
         for s in population:          
-            params, rewards = evaluate_uncertainty_set(s, num_samples, num_simulation, arbitrary_valuefunction, confidence_level)
+            params, rewards = evaluate_uncertainty_set(s, num_samples, num_simulation, arbitrary_valuefunction, sa_confidence)
             
             for m in range(Methods.NUM_METHODS.value):
                 trp = params[m][3]
@@ -183,7 +285,13 @@ if __name__ == "__main__":
 
         for m in range(Methods.NUM_METHODS.value):
             sol = rmdps[m].rsolve_vi("robust_l1".encode(),np.asarray(thresholds[m]))
-            calc_return[m].append(sol.valuefunction[0])
+            if LI_METHODS[m] is Methods.INCR_REPLACE_V:
+                calc_return[m].append(incrementally_replace_V(sol.valuefunction,\
+                                num_samples, num_simulation, num_iterations, sa_confidence))
+            elif LI_METHODS[m] is Methods.INCR_ADD_V:
+                calc_return[m].append(randomly_improve_V(sol.valuefunction,thresholds[m], dir_points))
+            else:
+                calc_return[m].append(sol.valuefunction[0])
 
 ### Plot results
 print(calc_return)

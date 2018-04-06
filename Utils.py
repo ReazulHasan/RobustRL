@@ -98,13 +98,19 @@ def find_nominal_point(p):
     #for v in m.getVars():
     #    print('%s %g' % (v.varName, v.x))
     
+    threshold = 0
+    for v in m.getVars():
+        if v.varName == "u":
+            threshold = v.x
+            break
+            
     nominal_params = m.getAttr('x', beta)
-
+    
     nominal_p = []
     for i in range(num_d):
         nominal_p.append(nominal_params[i])
     
-    return nominal_p#tuple(nominal_p)
+    return nominal_p, threshold#tuple(nominal_p)
 
 ### Test EM
 if __name__ == "__main__":

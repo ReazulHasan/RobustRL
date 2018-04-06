@@ -101,7 +101,7 @@ def generic_plot(X, Data, x_lab="x axis", y_lab="y axis", legend_pos="upper righ
     plt.show()
         
 # A generic simple plot
-def simple_generic_plot(X, Y, x_lab="x axis", y_lab="y axis", legend_pos="upper right", plot_title = "", figure_name="Generic_Plot.pdf"):
+def simple_generic_plot(X, Y, x_lab="x axis", y_lab="y axis", legend_pos="upper right", plot_title = "", figure_name="Simple_Generic_Plot.pdf"):
     plt.figure(num=1, figsize=(fig_height, fig_width), dpi=80, facecolor='w', edgecolor='k')
     plt.plot(X, Y, '+-', label = "Value Function")
 
