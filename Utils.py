@@ -12,14 +12,46 @@ if __name__ == "__main__":
         HOEFF = "Hoeffding"
         HOEFFTIGHT = "Hoeffding Tight"
         EM = "Expectation Maximization"
-        KNOWNV = "Known Value Function"
-        IMPROVEV = "Iteratively Improve Value Function"
-        ADDRANDOMV = "Iteratively Add Random Value Function"
+        INCR_REPLACE_V = "Incrementally Replace Value Function"
+        INCR_ADD_V = "Incrementally Add Value Function"
         
-        NUM_METHODS = 7 #Number of methods
+        NUM_METHODS = 6 #Number of methods
     
     LI_METHODS = [Methods.BAYES, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.EM,\
-                Methods.KNOWNV, Methods.IMPROVEV, Methods.ADDRANDOMV]
+                    Methods.INCR_REPLACE_V, Methods.INCR_ADD_V]
+
+###Process Gaussian distribution
+def discretize_gaussian(min_value, max_value, mean, std):
+    """ 
+    Computes a discrete approximation of the Gaussian distribution. The distribution
+    is bounded by min_value and max_value.
+    Both bounds are inclusive.
+    """
+    d = stats.norm(mean, std)
+    dist = np.array([d.pdf(v) for v in range(min_value, max_value + 1)])
+    # normalize it
+    dist /= np.sum(dist)
+    return dist
+    
+def normal_aposteriori(values, weights, std, prior_mean, prior_std):
+    """ 
+    Estimates the aposteriori Gaussian distribution:
+    see: https://en.wikipedia.org/wiki/Conjugate_prior#Continuous_distributions
+    
+    Assumes that the standard deviation of the demands is known but the 
+    mean is distributed according to the prior Gaussian distribution. std is the
+    standard deviation of the demand (known).
+    
+    The parameter weights represents an un-normalized weight on each value. 
+    """
+    n = np.sum(weights)
+    sum = np.dot(weights, values)
+    precision = (1 / prior_std**2 + n / std**2)
+    expected_mean = (prior_mean / prior_std**2 + sum / std**2) / precision
+    expected_std = 1/precision
+    return expected_mean, expected_std
+
+print(discretize_gaussian(0, 10, 3, 2))
 
 ### Apply Linear Program to compute the nominal point & apply quick select to find the uncertainty set with the required confidence
 def get_uset(points, nominal_point, conf_rank):

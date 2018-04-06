@@ -31,7 +31,6 @@ class TestAmbiguitySetMethods(unittest.TestCase):
         nominal = find_nominal_point(points)
         uset = get_uset(points,nominal,confidence_rank)
         self.assertEqual([[1,2],[1,1],[3,1],[4,2]], uset[0].tolist())
-    
 
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromTestCase(TestAmbiguitySetMethods)

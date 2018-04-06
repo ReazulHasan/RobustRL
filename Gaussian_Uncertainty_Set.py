@@ -7,40 +7,6 @@ from scipy import stats
 
 ### Scripts for computing with Gaussian distribution
 
-
-def discretize_gaussian(min_value, max_value, mean, std):
-    """ 
-    Computes a discrete approximation of the Gaussian distribution. The distribution
-    is bounded by min_value and max_value.
-    Both bounds are inclusive.
-    """
-    d = stats.norm(mean, std)
-    dist = np.array([d.pdf(v) for v in range(min_value, max_value + 1)])
-    # normalize it
-    dist /= np.sum(dist)
-    return dist
-    
-def normal_aposteriori(values, weights, std, prior_mean, prior_std):
-    """ 
-    Estimates the aposteriori Gaussian distribution:
-    see: https://en.wikipedia.org/wiki/Conjugate_prior#Continuous_distributions
-    
-    Assumes that the standard deviation of the demands is known but the 
-    mean is distributed according to the prior Gaussian distribution. std is the
-    standard deviation of the demand (known).
-    
-    The parameter weights represents an un-normalized weight on each value. 
-    """
-    n = np.sum(weights)
-    sum = np.dot(weights, values)
-    precision = (1 / prior_std**2 + n / std**2)
-    expected_mean = (prior_mean / prior_std**2 + sum / std**2) / precision
-    expected_std = 1/precision
-    return expected_mean, expected_std
-
-###
-print(discretize_gaussian(0, 10, 3, 2))
-
 ### construct & evaluate uncertainty with Gaussian distributed data points. Calculate L1 worstcase return
 def evaluate_gaussian_uncertainty(num_samples, confidence_level, num_simulation, known_ValueFunction, improve_ValueFunction, addRandom_ValueFunction, min_demand,\
                         max_demand, demand_mean_prior_mean = 50, demand_mean_prior_std = 15, true_demand_std = 25):

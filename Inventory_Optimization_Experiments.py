@@ -6,10 +6,10 @@ import Plot
 import numpy as np
 import tqdm
 
-initial, max_inventory, purchase_cost, sale_price = 0, 15, 2.0, 3.0
-prior_mean, prior_std, demand_std, rand_seed =  5.0, 2.0, 3, 3
+initial, max_inventory, purchase_cost, sale_price = 0, 5, 2.0, 3.0
+prior_mean, prior_std, demand_std, rand_seed =  2.0, 1.0, 1.0, 3
 num_iterations_for_vf = 10
-horizon, runs = 15, 20
+horizon, runs = 10, 10
 discount_factor = 0.9
 num_samples = 15
 tuple_size = 3 #s-a-th
@@ -134,6 +134,15 @@ def construct_rmdp(s, a, value_functions, rmdp, dir_points, is_multiple_v=False)
     trp = None
     th = 0
     if is_multiple_v:
+        if len(guk[1]) > 1:
+            trp0 = find_nominal_point(np.asarray(guk[1][:-1]))
+            th0 = get_uset(np.asarray(guk[1][:-1]), trp0, len(guk[1][:-1]))[1]
+            dist = np.linalg.norm(trp0-guk[1][-1], ord=1)
+            if dist<th0:
+                print(s,a,"new nominal is inside L1 ball", "prev threshold",th0,"new distance",dist)
+            else:
+                print(s,a,"new nominal is outside L1 ball", "prev threshold",th0,"new distance",dist)
+        
         #Find the center of the L1 ball for the nominal points with different value functions
         trp = find_nominal_point(np.asarray(guk[1]))
         
@@ -216,6 +225,7 @@ def randomly_improve_V(vf, threshold, dir_points):
         rmdp = crobust.MDP(0, discount_factor)
         pos=0
         
+        print("num iteration----",i)
         for s in range(mdp.state_count()):
             actions = mdp.action_count(s)
             for a in range(actions):
@@ -303,7 +313,7 @@ if __name__ == "__main__":
                 calc_return[m].append(sol.valuefunction[0])
             print(m,calc_return[m])
             #print(LI_METHODS[m].value,sol.valuefunction)
-
+        print(thresholds)
 ###
 print(calc_return)
 generic_plot(sample_steps, calc_return, "Number of samples", "Returned value to initial state")
