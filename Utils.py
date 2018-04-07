@@ -4,6 +4,7 @@ import numpy as np
 from gurobipy import *
 import sys
 from enum import Enum
+from scipy import stats
 
 ### Enumerate experimenting methods
 if __name__ == "__main__":
@@ -61,9 +62,14 @@ def get_uset(points, nominal_point, conf_rank):
 
     @param conf_rank: how many points to take 
     """
+
     distances = [( p, np.linalg.norm(p - nominal_point, ord = 1)) for p in points]
     distances.sort(key = lambda x : x[1])
-    res_list = np.squeeze([distances[i][0] for i in range(conf_rank)])
+    res_list = np.asarray([distances[i][0] for i in range(conf_rank)])
+
+    if res_list.shape[0]>1:
+        res_list = np.squeeze(res_list)
+
     psi = distances[conf_rank-1][1]
     return res_list, psi
 
@@ -128,7 +134,7 @@ if __name__ == "__main__":
     rand_nominal_pos = np.random.randint(num_points)
     
     nominal_p = points[rand_nominal_pos]
-    
+    print("rand_nominal_pos",rand_nominal_pos,"nominal_p",nominal_p)
     prev_psi = sys.float_info.max
     for i in range(num_iter):
         nominal_list.append(nominal_p)
@@ -138,7 +144,7 @@ if __name__ == "__main__":
         
         prev_psi = psi
         psi_list.append(psi)
-        nominal_p = find_nominal_point(u_set)
+        nominal_p, _ = find_nominal_point(u_set)
     
     nominal_list = np.squeeze(nominal_list)
     
@@ -152,14 +158,15 @@ def calc_EM(points, confidence_level, nominal_p):
     num_count = 0
     nominal_list = []
     psi_list = []
+
     confidence_rank = math.ceil(len(points) * confidence_level)
-    
+
     prev_psi = np.inf
     for i in range(num_iter):        
         u_set, psi = get_uset(points, nominal_p, confidence_rank)
         if psi >= prev_psi or num_count>=100:
             break
-            
+
         assert(psi <= prev_psi + 1e-5)
         
         #print("i",i,"psi",psi)
@@ -167,7 +174,7 @@ def calc_EM(points, confidence_level, nominal_p):
         prev_psi = psi
         psi_list.append(psi)
         nominal_list.append(nominal_p)
-        nominal_p = find_nominal_point(u_set)
+        nominal_p, _ = find_nominal_point(u_set)
 
     if len(nominal_list) > 1:
         nominal_list = np.squeeze(nominal_list)
@@ -183,6 +190,7 @@ def calc_EM_rand(points, confidence_level, nominal_p):
     
     for i in range(10):
         next_nominal_p = points[np.random.randint(points.shape[0])]
+        
         next_nominal, next_psi = calc_EM(points, confidence_level, next_nominal_p)
         if(next_psi < new_psi):
             new_psi = next_psi
@@ -204,19 +212,16 @@ def construct_uset_known_value_function(transition_points, value_function, confi
     @param confidence Desired confidence level, such as 0.99
     """
     points = []
-    #print("len(transition_points)",len(transition_points[0]), "len(value_function)",len(value_function))
-    #print("transition_points",transition_points[0], "value_function",value_function)
-    #print("transition points",transition_points, "value_function", value_function)
+
     for p in transition_points:
         points.append( (p,p@value_function) )
     points.sort(key=lambda x: x[1])
-    #print("points with value_function",points)
+
     conf_rank = math.ceil(len(transition_points)*confidence)
     robust_ret = points[-conf_rank][1]
     robust_th = 0 #np.linalg.norm(points[-int(conf_rank)][0]-points[-int(conf_rank/2)][0], ord=1)
     nominal_point = points[-conf_rank][0]
     
-    #print("centroid",points[-int(conf_rank/2)], "ret", robust_ret, "th", robust_th)
     return (robust_ret, robust_th, nominal_point)
     
     

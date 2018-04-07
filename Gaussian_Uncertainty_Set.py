@@ -89,7 +89,7 @@ def evaluate_gaussian_uncertainty(num_samples, confidence_level, num_simulation,
         # !!! assume that the state index is the demand !!!
         # this is the distribution over the mean of the demand! not the distribution of the demand
         estmean_demand_mean, estmean_demand_std = normal_aposteriori(demand_values, mult, \
-                                    true_demand_std, demand_mean_prior_mean, demand_mean_prior_std)
+                            true_demand_std, demand_mean_prior_mean, demand_mean_prior_std)
 
         dir_points = np.array(\
             [discretize_gaussian(min_demand, max_demand+1, 

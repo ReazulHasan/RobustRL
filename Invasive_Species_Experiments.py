@@ -6,46 +6,20 @@ import Plot
 import numpy as np
 import tqdm
 
-horizon, num_runs = 50, 100
+horizon, num_runs = 100, 500
 min_population, initial_population, carrying_capacity = 0, 5, 15
 mean_growth_rate, std_growth_rate, std_observation = 1.02, 0.02, 2
-beta_1, beta_2, n_hat = 0.001, -0.0000021, 9
+beta_1, beta_2, n_hat = 0.001, -0.0000021, int(carrying_capacity*2/3)
 threshold_control, prob_control, seed = 0, 0.5, 5
 discount_factor = 0.9
-num_samples, num_actions = 5, 2
-bayes_samples = 5
+num_samples, num_actions = 20, 2
 population = np.arange(min_population, carrying_capacity + 1, dtype=np.double)
-
-### Construct the original MDP, solve the MDP & find an arbitrary policy
-if __name__ == "__main__":
-    seed = np.random.randint(num_runs)
-    #initial_population = 30
-    species_simulator = crobust.SimulatorSpecies(initial_population, carrying_capacity,\
-                mean_growth_rate, std_growth_rate, std_observation, beta_1, beta_2, n_hat,\
-                threshold_control, prob_control, seed)
-    samples = species_simulator.simulate_species(horizon, num_runs)
-    
-    states_from = samples.get_states_from()
-    actions = samples.get_actions()
-    states_to = samples.get_states_to()
-    rewards = samples.get_rewards()
-    
-    smdp = crobust.SampledMDP()
-    smdp.add_samples(samples)
-    mdp = smdp.get_mdp(discount_factor)
-    
-    orig_sol = mdp.solve_vi()
-    orig_policy = orig_sol.policy
-    
-    random_policy = np.random.randint(2, size=(carrying_capacity-min_population+1))
-    arbitrary_valuefunction = mdp.rewards_vec(random_policy)
-    #print(arbitrary_valuefunction)
 
 ### Construct uncertainty set for each state-action
 
-def get_transition_reward(current_population, horizon, num_samples, seed):
+def get_Bootstrapped_transition_kernel(current_population, horizon, num_samples, seed):
     transitions_points = [[] for _ in range(num_actions)]
-    rewards = np.zeros((num_actions, carrying_capacity-min_population+1))
+    #rewards = np.zeros((num_actions, carrying_capacity-min_population+1))
     
     for i in range(num_samples):
         transitions = np.zeros((num_actions, carrying_capacity-min_population+1))
@@ -59,15 +33,106 @@ def get_transition_reward(current_population, horizon, num_samples, seed):
         for a,s,r in zip(samples.get_actions(),samples.get_states_to(),samples.get_rewards()):
             transitions[a,s] += 1
             count[a] +=1
-            rewards[a,s] = r
+            #rewards[a,s] = r
         for a in range(num_actions):
             transitions[a] /= count[a] if count[a]>0 else 1
             transitions_points[a].append( (transitions[a]) )
+    #print("len(transitions_points[0])",len(transitions_points[0][0]))
+    return transitions_points#, rewards
 
-    return transitions_points, rewards
+def calc_reward(next_state, trp_to_next_state, action):
+    return next_state*trp_to_next_state*(-1) + action * (-4000)
+
+### Bayesian approach to construct uncertainty set
+
+def get_Bayesian_transition_kernel(current_population, num_samples):
+    bayes_samples = 20
+    transitions_points = {}#[[] for _ in range(num_actions)]
+    if current_population==0:
+        current_population=1
+    for action in range(num_actions):
+        growth_rate_mean_prior_mean = max(0.0, mean_growth_rate - action * \
+        current_population * beta_1 - action*max(current_population-n_hat,0)**2 * beta_2 )
         
+        growth_rate_mean_prior_std = std_growth_rate
+        
+        true_growth_rate_mean = np.random.normal(growth_rate_mean_prior_mean,\
+                                                        growth_rate_mean_prior_std)
+        #let's take the same prior & true std for simplicity
+        true_growth_rate_std = growth_rate_mean_prior_std 
+        
+        #Here, growth rate is a normally distributed random variable & the product with
+        #current_population defines the next states. We discretize the distribution over the 
+        #next states.
+        #Multiplying a random variable by a constant value, multiplies the expected value or mean 
+        #by that constant. current_population is the constant here, growth rate is the normally
+        #distributed random variable
+        growth_rate_mean_prior_mean = growth_rate_mean_prior_mean * current_population
+        true_population_mean = true_growth_rate_mean * current_population
+        
+        #Multiplying a random variable by a constant increases the variance by the square of the
+        #constant. Hence, increases the std by that constant.
+        growth_rate_mean_prior_std = growth_rate_mean_prior_std * current_population
+        true_population_std = true_growth_rate_std * current_population
+        
+        true_distribution = discretize_gaussian(min_population, carrying_capacity,\
+                                        true_population_mean, true_population_std)
+        
+        mult = np.random.multinomial(num_samples, true_distribution)
+    
+        estmean_population_mean, estmean_population_std = normal_aposteriori(population, mult, \
+                            true_population_std, growth_rate_mean_prior_mean, growth_rate_mean_prior_std)
+                            
+        dir_points = np.array([discretize_gaussian(min_population, carrying_capacity,\
+                    np.random.normal(estmean_population_mean, estmean_population_std),\
+                    true_population_std) for k in range(bayes_samples)])
+        
+        transitions_points[action] = dir_points
+        #print(dir_points)
+    return transitions_points
+    
+#print(get_Bayesian_transition_kernel(10, 5))
+
+### Construct the original MDP, solve the MDP & find an arbitrary policy
+if __name__ == "__main__":
+    seed = np.random.randint(num_runs)
+    #initial_population = 30
+    '''
+    species_simulator = crobust.SimulatorSpecies(initial_population, carrying_capacity,\
+                mean_growth_rate, std_growth_rate, std_observation, beta_1, beta_2, n_hat,\
+                threshold_control, prob_control, seed)
+    samples = species_simulator.simulate_species(horizon, num_runs)
+    
+    states_from = samples.get_states_from()
+    actions = samples.get_actions()
+    states_to = samples.get_states_to()
+    rewards = samples.get_rewards()
+    
+    smdp = crobust.SampledMDP()
+    smdp.add_samples(samples)
+    mdp = smdp.get_mdp(discount_factor)
+    '''
+    mdp = crobust.MDP(0, discount_factor)
+    for s in population:
+        transitions_points = get_Bootstrapped_transition_reward(s, horizon, 1, i)
+        for a in range(num_actions):
+            trp = transitions_points[a][0]
+            
+            for next_st in population:
+                reward = calc_reward(next_st, trp[int(next_st)], a)
+                mdp.add_transition(s, a, next_st, trp[int(next_st)], reward)
+    
+    orig_sol = mdp.solve_vi()
+    orig_policy = orig_sol.policy
+    
+    #print(len(orig_policy))
+    random_policy = np.random.randint(2, size=(carrying_capacity-min_population+1))
+    arbitrary_valuefunction = mdp.rewards_vec(random_policy)
+    #print(arbitrary_valuefunction)
+
+###
 def evaluate_uncertainty_set(current_population, num_samples, num_simulation, value_function, confidence_level):
-    horizon = 1
+    horizon = 1 #only take samples of the next states from current state
     num_next_states = carrying_capacity-min_population+1
     num_v = len(value_function)
     
@@ -86,13 +151,14 @@ def evaluate_uncertainty_set(current_population, num_samples, num_simulation, va
     
     for i in range(num_simulation):
         
-        transitions_points, rewards = get_transition_reward(current_population, \
-                                                horizon, num_samples, i)
+        #transitions_points = get_Bootstrapped_transition_reward(current_population, \
+                                                #horizon, num_samples, i)
+        transitions_points = get_Bayesian_transition_kernel(current_population, num_samples)
         
         for a in range(num_actions):
             dir_points = np.asarray(transitions_points[a])
             
-            #print(len(dir_points))
+            #print("dir_points.shape",dir_points[0].shape, dir_points[0])
             
             nominal_prob_bayes = np.mean(dir_points, axis=0)
             nominal_prob_bayes /= np.sum(nominal_prob_bayes)
@@ -142,7 +208,7 @@ def evaluate_uncertainty_set(current_population, num_samples, num_simulation, va
                 np.mean(incrementallyReplaceV_nominalPoints,axis=1)),\
             (Methods.INCR_ADD_V, np.mean(incrementallyAddV_th, axis=1),\
                 np.std(incrementallyAddV_th,axis=1),\
-                np.mean(incrementallyAddV_nomianlPoints,axis=1))], rewards
+                np.mean(incrementallyAddV_nomianlPoints,axis=1))]
 
 #print(evaluate_uncertainty_set(5, 5, 5, arbitrary_valuefunction, 0.9))
 
@@ -152,12 +218,20 @@ def incrementally_replace_V(valuefunction, num_samples, num_simulation,\
     horizon = 1
     X = []
     Y = []
+    
+    list_transitions_points = {}
+    for s in population:
+        #transitions_points = get_Bootstrapped_transition_reward(s, horizon,\
+                                        #num_samples, np.random.randint(len(population)))
+        transitions_points = get_Bayesian_transition_kernel(s, num_samples)
+        list_transitions_points[s] = transitions_points
+        
     for i in range(num_update):
         threshold = [[] for _ in range(3)]
         rmdp = crobust.MDP(0, discount_factor)
         for s in population:
-            transitions_points, rewards = get_transition_reward(s, horizon,\
-                                                        num_samples, i)
+            #transitions_points = get_Bootstrapped_transition_reward(s, horizon, num_samples, i)
+            transitions_points = list_transitions_points[s] #get_Bayesian_transition_kernel(s, num_samples)
             for a in range(num_actions):
                 dir_points = np.asarray(transitions_points[a])
                 res = construct_uset_known_value_function(dir_points, valuefunction,\
@@ -170,17 +244,17 @@ def incrementally_replace_V(valuefunction, num_samples, num_simulation,\
                 trp = res[2]
                 
                 for next_st in population:
-                    rmdp.add_transition(s, a, next_st, trp[int(next_st)],\
-                                            rewards[a,int(next_st)])
+                    reward = calc_reward(next_st, trp[int(next_st)], a)
+                    rmdp.add_transition(s, a, next_st, trp[int(next_st)], reward)
                 
         sol = rmdp.rsolve_vi("robust_l1".encode(),threshold)
         valuefunction = sol.valuefunction
         X.append(i)
         Y.append(valuefunction[0])
-    print(X, Y)
-    simple_generic_plot(X, Y, "Number of samples", "Returned value to initial state")
-
-incrementally_replace_V(arbitrary_valuefunction, 5, 5, 5, 0.9)
+    #print(X, Y)
+    #simple_generic_plot(X, Y, "Number of samples", "Returned value to initial state")
+    return valuefunction[0]
+#incrementally_replace_V(arbitrary_valuefunction, 5, 5, 5, 0.9)
 
 ###
 def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
@@ -191,19 +265,19 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
     
     valuefunctions = [valuefunctions]
     th_list = []
-    list_transitions_points, list_rewards = {}, {}
+    list_transitions_points = {}
     for s in population:
-        transitions_points, rewards = get_transition_reward(s, horizon,\
-                                        num_samples, np.random.randint(len(population)))
+        #transitions_points = get_Bootstrapped_transition_reward(s, horizon,\
+                                        #num_samples, np.random.randint(len(population)))
+        transitions_points = get_Bayesian_transition_kernel(s, num_samples)
         list_transitions_points[s] = transitions_points
-        list_rewards[s] = rewards
         
     for i in range(num_update):
         #print("valuefunctions",i,": ",valuefunctions)
         threshold = [[] for _ in range(3)]
         rmdp = crobust.MDP(0, discount_factor)
         for s in population:
-            transitions_points, rewards = list_transitions_points[s], list_rewards[s]
+            transitions_points = list_transitions_points[s]
             #get_transition_reward(s, horizon, num_samples, i)
             for a in range(num_actions):
                 dir_points = np.asarray(transitions_points[a])
@@ -227,8 +301,8 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
                 threshold[2].append(th)
                 
                 for next_st in population:
-                    rmdp.add_transition(s, a, next_st, trp[int(next_st)],\
-                                            rewards[a,int(next_st)])
+                    reward = calc_reward(next_st, trp[int(next_st)], a)
+                    rmdp.add_transition(s, a, next_st, trp[int(next_st)], reward)
                 
         sol = rmdp.rsolve_vi("robust_l1".encode(),threshold)
         valuefunction = sol.valuefunction
@@ -236,17 +310,19 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
         X.append(i)
         Y.append(valuefunction[0])
     #print(X, Y)
-    print(th_list)
-    simple_generic_plot(X, Y, "Number of samples", "Returned value to initial state")
+    #print(th_list)
+    #simple_generic_plot(X, Y, "Number of samples", "Returned value to initial state")
+    return valuefunctions[-1][0]
 
-incrementally_add_V(arbitrary_valuefunction, 30, 10, 10, 0.9)
+#incrementally_add_V(arbitrary_valuefunction, 30, 10, 10, 0.9)
+
 ### run experiments
 if __name__ == "__main__":
     # number of sampling steps
-    num_iterations = 5
+    num_iterations = 10
     # number of runs
-    num_simulation = 5
-    sample_step = 2
+    num_simulation = 10
+    sample_step = 5
     confidence_level = 0.9
     
     #max number of iterations to improve value functions
@@ -254,7 +330,7 @@ if __name__ == "__main__":
     
     #(1-overall_confidence) is the total violation allowed. This total violation is distributed among all the state action pairs
     # according to the Union bound.
-    sa_confidence = 1 - ((1 - confidence_level) / action_count)
+    sa_confidence = 1 - ( (1 - confidence_level) / (num_actions * (carrying_capacity-min_population+1)) )
     
     sample_steps = np.arange(sample_step,sample_step*num_iterations+1, step = sample_step)
     
@@ -269,7 +345,7 @@ if __name__ == "__main__":
             rmdps.append(crobust.MDP(0, discount_factor))
         
         for s in population:          
-            params, rewards = evaluate_uncertainty_set(s, num_samples, num_simulation, arbitrary_valuefunction, sa_confidence)
+            params = evaluate_uncertainty_set(s, num_samples, num_simulation, arbitrary_valuefunction, sa_confidence)
             
             for m in range(Methods.NUM_METHODS.value):
                 trp = params[m][3]
@@ -277,8 +353,8 @@ if __name__ == "__main__":
                 
                 for a in range(num_actions):
                     for next_st in population:
-                        rmdps[m].add_transition(s, a, next_st, trp[a][int(next_st)],\
-                                            rewards[a,int(next_st)])
+                        reward = calc_reward(next_st, trp[a][int(next_st)], a)
+                        rmdps[m].add_transition(s, a, next_st, trp[a][int(next_st)], reward)
                     thresholds[m][0].append(s)
                     thresholds[m][1].append(a)
                     thresholds[m][2].append(threshold[a])
@@ -289,7 +365,8 @@ if __name__ == "__main__":
                 calc_return[m].append(incrementally_replace_V(sol.valuefunction,\
                                 num_samples, num_simulation, num_iterations, sa_confidence))
             elif LI_METHODS[m] is Methods.INCR_ADD_V:
-                calc_return[m].append(randomly_improve_V(sol.valuefunction,thresholds[m], dir_points))
+                calc_return[m].append(incrementally_add_V(sol.valuefunction,\
+                                num_samples, num_simulation, num_iterations, sa_confidence))
             else:
                 calc_return[m].append(sol.valuefunction[0])
 
@@ -297,43 +374,3 @@ if __name__ == "__main__":
 print(calc_return)
 generic_plot(sample_steps, calc_return, "Number of samples", "Returned value to initial state")
 
-
-### Bayesian approach to construct uncertainty set
-
-def evaluate_Bayesian_uncertainty_set(current_population, action):
-    
-    current_mean_growth_rate = max(0.0, mean_growth_rate -action*current_population*beta_1 - action*max(current_population-n_hat,0)**2 * beta_2 )
-    
-    current_growth_rate = np.random.normal(current_mean_growth_rate, std_growth_rate)
-    
-    next_population = max(0, min(carrying_capacity, current_growth_rate * current_population))
-    
-    #Here, growth rate is a normally distributed random variable & the product with
-    #current_population defines the next states. We discretize the distribution over the 
-    #next states.
-    #Multiplying a random variable by a constant value, multiplies the expected value or mean 
-    #by that constant. current_population is the constant here, growth rate is the normally
-    #distributed random variable
-    current_mean_transition = current_mean_growth_rate * current_population
-    
-    #Multiplying a random variable by a constant increases the variance by the square of the
-    #constant. Hence, increases the std by that constant.
-    current_std_transition = std_growth_rate * current_population
-    
-    true_distribution = discretize_gaussian(min_population, carrying_capacity+1, next_population, std_observation)
-    
-    mult = np.random.multinomial(num_samples, true_distribution)
-    
-    #print(current_mean_growth_rate, std_growth_rate)
-    #print(current_mean_transition, current_std_transition)
-    for ind,val in enumerate(mult):
-        if val>0:
-            print(ind,val)
-    #print(mult)
-
-    
-#evaluate_uncertainty_set(10, 1)
-#evaluate_uncertainty_set(10, 0)
-
-#evaluate_uncertainty_set(100, 1)
-evaluate_Bayesian_uncertainty_set(100, 0)
