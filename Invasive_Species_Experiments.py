@@ -114,7 +114,7 @@ if __name__ == "__main__":
     '''
     mdp = crobust.MDP(0, discount_factor)
     for s in population:
-        transitions_points = get_Bootstrapped_transition_reward(s, horizon, 1, i)
+        transitions_points = get_Bootstrapped_transition_kernel(s, horizon, 1, i)
         for a in range(num_actions):
             trp = transitions_points[a][0]
             
@@ -128,7 +128,10 @@ if __name__ == "__main__":
     #print(len(orig_policy))
     random_policy = np.random.randint(2, size=(carrying_capacity-min_population+1))
     arbitrary_valuefunction = mdp.rewards_vec(random_policy)
-    #print(arbitrary_valuefunction)
+    
+    initial = np.ones(carrying_capacity-min_population+1)/(carrying_capacity-min_population+1)
+    print(initial)
+    print(np.dot(initial,orig_sol.valuefunction))
 
 ###
 def evaluate_uncertainty_set(current_population, num_samples, num_simulation, value_function, confidence_level):
@@ -253,7 +256,7 @@ def incrementally_replace_V(valuefunction, num_samples, num_simulation,\
         Y.append(valuefunction[0])
     #print(X, Y)
     #simple_generic_plot(X, Y, "Number of samples", "Returned value to initial state")
-    return valuefunction[0]
+    return valuefunction
 #incrementally_replace_V(arbitrary_valuefunction, 5, 5, 5, 0.9)
 
 ###
@@ -312,7 +315,7 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
     #print(X, Y)
     #print(th_list)
     #simple_generic_plot(X, Y, "Number of samples", "Returned value to initial state")
-    return valuefunctions[-1][0]
+    return valuefunctions[-1]
 
 #incrementally_add_V(arbitrary_valuefunction, 30, 10, 10, 0.9)
 
@@ -361,16 +364,19 @@ if __name__ == "__main__":
 
         for m in range(Methods.NUM_METHODS.value):
             sol = rmdps[m].rsolve_vi("robust_l1".encode(),np.asarray(thresholds[m]))
+            print("Method",LI_METHODS[m].value,"value function",sol.valuefunction,"policy",sol.policy)
             if LI_METHODS[m] is Methods.INCR_REPLACE_V:
-                calc_return[m].append(incrementally_replace_V(sol.valuefunction,\
-                                num_samples, num_simulation, num_iterations, sa_confidence))
+                valuefunction = incrementally_replace_V(sol.valuefunction, num_samples,\
+                                                num_simulation, num_iterations, sa_confidence)
+                calc_return[m].append(np.dot(initial,valuefunction))
             elif LI_METHODS[m] is Methods.INCR_ADD_V:
-                calc_return[m].append(incrementally_add_V(sol.valuefunction,\
-                                num_samples, num_simulation, num_iterations, sa_confidence))
+                valuefunction = incrementally_add_V(sol.valuefunction, num_samples,\
+                                                num_simulation, num_iterations, sa_confidence)
+                calc_return[m].append(np.dot(initial,valuefunction))
             else:
-                calc_return[m].append(sol.valuefunction[0])
+                calc_return[m].append(np.dot(initial,sol.valuefunction))
 
 ### Plot results
 print(calc_return)
-generic_plot(sample_steps, calc_return, "Number of samples", "Returned value to initial state")
+generic_plot(sample_steps, calc_return, "Number of samples", "Total expected return \n (initial distribution x valuefunction)")
 
