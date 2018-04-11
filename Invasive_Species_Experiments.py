@@ -6,13 +6,13 @@ import Plot
 import numpy as np
 import tqdm
 
-horizon, num_runs = 100, 500
-min_population, initial_population, carrying_capacity = 0, 5, 15
-mean_growth_rate, std_growth_rate, std_observation = 1.02, 0.02, 2
+horizon, num_runs = 10, 20
+min_population, initial_population, carrying_capacity = 0, 7, 20
+mean_growth_rate, std_growth_rate, std_observation = 1.1, 0.4, 2
 beta_1, beta_2, n_hat = 0.001, -0.0000021, int(carrying_capacity*2/3)
 threshold_control, prob_control, seed = 0, 0.5, 5
 discount_factor = 0.9
-num_samples, num_actions = 20, 2
+num_samples, num_actions = 30, 2
 population = np.arange(min_population, carrying_capacity + 1, dtype=np.double)
 
 ### Construct uncertainty set for each state-action
@@ -296,9 +296,9 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
                 #value functions
                 trp, th = find_nominal_point(np.asarray(nomianl_points))
                 
-                if s==0 and a==1:
-                    th_list.append(th)
-                
+                #if s==5 and i==num_update-1:
+                    #print("incrementally_add_V, transitions_points",trp, "Threshold", th)
+                        
                 threshold[0].append(s)
                 threshold[1].append(a)
                 threshold[2].append(th)
@@ -312,8 +312,9 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
         valuefunctions.append(valuefunction)
         X.append(i)
         Y.append(valuefunction[0])
+    print("valuefunctions",valuefunctions)
+    #print("Incrementally add V", "threshold: ", threshold)
     #print(X, Y)
-    #print(th_list)
     #simple_generic_plot(X, Y, "Number of samples", "Returned value to initial state")
     return valuefunctions[-1]
 
@@ -322,9 +323,9 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
 ### run experiments
 if __name__ == "__main__":
     # number of sampling steps
-    num_iterations = 10
+    num_iterations = 5
     # number of runs
-    num_simulation = 10
+    num_simulation = 5
     sample_step = 5
     confidence_level = 0.9
     
@@ -354,6 +355,9 @@ if __name__ == "__main__":
                 trp = params[m][3]
                 threshold = params[m][1]
                 
+                #if s==5 and m==0:
+                    #print("transition probability",trp,"threshold",threshold)
+                
                 for a in range(num_actions):
                     for next_st in population:
                         reward = calc_reward(next_st, trp[a][int(next_st)], a)
@@ -363,8 +367,10 @@ if __name__ == "__main__":
                     thresholds[m][2].append(threshold[a])
 
         for m in range(Methods.NUM_METHODS.value):
+            #if LI_METHODS[m] == Methods.BAYES:
+                #print(Methods.BAYES.value," ", rmdps[m].to_json(), "thresholds: ", thresholds[m])
             sol = rmdps[m].rsolve_vi("robust_l1".encode(),np.asarray(thresholds[m]))
-            print("Method",LI_METHODS[m].value,"value function",sol.valuefunction,"policy",sol.policy)
+            #print("Method",LI_METHODS[m].value,"value function",sol.valuefunction,"policy",sol.policy)
             if LI_METHODS[m] is Methods.INCR_REPLACE_V:
                 valuefunction = incrementally_replace_V(sol.valuefunction, num_samples,\
                                                 num_simulation, num_iterations, sa_confidence)

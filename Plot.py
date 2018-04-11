@@ -8,7 +8,7 @@ font = {'weight' : 'normal',
 plt.rc('font', **font)
 
 LI_COLORS = ['black','c','r','m','g','b','violet']
-lineStyles = ['-','--', '-.', ':']
+lineStyles = ['--', '-.', ':']
 markers = ['D', '^', '8', 's', 'p', 'v', '.', 'x']
 #markers = ['s','<', '^', '>', 'v', '.']
 
@@ -84,7 +84,7 @@ def plot_violations(results_dir, sample_steps, compare_methods, figure_name="Vio
     plt.show()
     
 # The generic method to plot data. First param is the x axis, second is a list of y axis data
-def generic_plot(X, Data, x_lab="x axis", y_lab="y axis", legend_pos="upper right", plot_title = "", figure_name="Generic_Plot.pdf"):
+def generic_plot(X, Data, x_lab="x axis", y_lab="y axis", legend_pos="lower right", plot_title = "", figure_name="Generic_Plot.pdf"):
     plt.figure(num=1, figsize=(fig_height, fig_width), dpi=80, facecolor='w', edgecolor='k')
     for method_index in range(Methods.NUM_METHODS.value):
         if LI_METHODS[method_index] is Methods.EM:
@@ -97,7 +97,7 @@ def generic_plot(X, Data, x_lab="x axis", y_lab="y axis", legend_pos="upper righ
     plt.legend(loc=legend_pos)
     #plt.yscale('log')
     plt.grid()
-    plt.savefig("fig/"+figure_name+".pdf")
+    plt.savefig("fig/"+figure_name)
     plt.show()
         
 # A generic simple plot
@@ -111,7 +111,7 @@ def simple_generic_plot(X, Y, x_lab="x axis", y_lab="y axis", legend_pos="upper 
     plt.legend(loc=legend_pos)
     #plt.yscale('log')
     plt.grid()
-    plt.savefig("fig/"+figure_name+".pdf")
+    plt.savefig("fig/"+figure_name)
     plt.show()
 
     
