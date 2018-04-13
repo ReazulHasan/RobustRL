@@ -6,18 +6,32 @@ import Plot
 import numpy as np
 import tqdm
 
-horizon, num_runs = 10, 20
-min_population, initial_population, carrying_capacity = 0, 7, 20
+horizon, num_runs = 30, 50
+min_population, carrying_capacity = 0, 50
+initial_population = int(carrying_capacity/3)#np.random.randint(min_population, carrying_capacity)
 mean_growth_rate, std_growth_rate, std_observation = 1.1, 0.4, 2
 beta_1, beta_2, n_hat = 0.001, -0.0000021, int(carrying_capacity*2/3)
 threshold_control, prob_control, seed = 0, 0.5, 5
 discount_factor = 0.9
-num_samples, num_actions = 30, 2
+num_samples, num_actions = 50, 2
 population = np.arange(min_population, carrying_capacity + 1, dtype=np.double)
 
 ### Construct uncertainty set for each state-action
 
 def get_Bootstrapped_transition_kernel(current_population, horizon, num_samples, seed):
+    """
+    Use bootstrapping to produce a transition matrix for all possible actions from current state.
+    Sample multiple transitions from a specific state-action to compute a transition probability over
+    next states. 
+    
+    @current_population The level of current population, which really is the state
+    @horizon Sampling horizon for the bootstrapping
+    @num_samples Number of bootstrapped samples
+    @seed Seed for the random number
+    
+    @return transition_points Transition points for all the actions
+    """
+    
     transitions_points = [[] for _ in range(num_actions)]
     #rewards = np.zeros((num_actions, carrying_capacity-min_population+1))
     
@@ -41,12 +55,30 @@ def get_Bootstrapped_transition_kernel(current_population, horizon, num_samples,
     return transitions_points#, rewards
 
 def calc_reward(next_state, trp_to_next_state, action):
+    """
+    Compute the reward for the next state & action.
+    
+    @next_state The next state in the transition
+    @trp_to_next_state Transition probability for the next state
+    @action The action taken
+    
+    @return reward Computed reward
+    """
     return next_state*trp_to_next_state*(-1) + action * (-4000)
 
 ### Bayesian approach to construct uncertainty set
 
 def get_Bayesian_transition_kernel(current_population, num_samples):
-    bayes_samples = 20
+    """
+    Use Bayesian approach to produce a transition matrix for all possible actions from current state.
+    Use posterior distribution over the next population from the prior growth rate distribution.
+    
+    @current_population The level of current population, which really is the state
+    @num_samples Number of samples from true distribution
+    
+    @return transition_points Transition points for all the actions
+    """
+    bayes_samples = 30
     transitions_points = {}#[[] for _ in range(num_actions)]
     if current_population==0:
         current_population=1
@@ -93,7 +125,7 @@ def get_Bayesian_transition_kernel(current_population, num_samples):
     
 #print(get_Bayesian_transition_kernel(10, 5))
 
-### Construct the original MDP, solve the MDP & find an arbitrary policy
+### Construct a boostrapped MDP, solve it, find an arbitrary policy
 if __name__ == "__main__":
     seed = np.random.randint(num_runs)
     #initial_population = 30
@@ -127,14 +159,27 @@ if __name__ == "__main__":
     
     #print(len(orig_policy))
     random_policy = np.random.randint(2, size=(carrying_capacity-min_population+1))
-    arbitrary_valuefunction = mdp.rewards_vec(random_policy)
+    arbitrary_valuefunction = mdp.solve_vi(policy=random_policy).valuefunction#rewards_vec(random_policy)
     
+    print(arbitrary_valuefunction)
     initial = np.ones(carrying_capacity-min_population+1)/(carrying_capacity-min_population+1)
-    print(initial)
-    print(np.dot(initial,orig_sol.valuefunction))
+    #print(initial)
+    #print(np.dot(initial,orig_sol.valuefunction))
 
 ###
 def evaluate_uncertainty_set(current_population, num_samples, num_simulation, value_function, confidence_level):
+    """
+    Run evaluation of the uncertainty set to compute the nominal point & threshold with different
+    methods (e.g. Bayes Simple, Hoeffding etc.).
+    
+    @current_population Current population level
+    @num_samples Number of samples to estimate the true distribution
+    @num_simulation Number of simulation
+    @value_function The initially known value function
+    @confidence_level The required confidence level
+    
+    @return nominal points & threshold for different methods
+    """
     horizon = 1 #only take samples of the next states from current state
     num_next_states = carrying_capacity-min_population+1
     num_v = len(value_function)
@@ -218,6 +263,18 @@ def evaluate_uncertainty_set(current_population, num_samples, num_simulation, va
 ###
 def incrementally_replace_V(valuefunction, num_samples, num_simulation,\
                                                         num_update, sa_confidence):
+    """
+    Method to incrementally improve the value function by replacing the old value function with 
+    the new one.
+    
+    @value_function The initially known value function
+    @num_samples Number of samples to estimate the true distribution
+    @num_simulation Number of simulation
+    @num_update Number of updates over the value functions
+    @sa_confidence Required confidence for each state-action from 
+    
+    @return valuefunction The updated final value function
+    """
     horizon = 1
     X = []
     Y = []
@@ -262,6 +319,19 @@ def incrementally_replace_V(valuefunction, num_samples, num_simulation,\
 ###
 def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
                                                         num_update, sa_confidence):
+    """
+    Method to incrementally improve value function by adding the new value function with 
+    previous valuefunctions, finding the nominal point & threshold for this cluster of value functions
+    with the required sa-confidence.
+    
+    @value_function The initially known value function
+    @num_samples Number of samples to estimate the true distribution
+    @num_simulation Number of simulation
+    @num_update Number of updates over the value functions
+    @sa_confidence Required confidence for each state-action from 
+    
+    @return valuefunction The updated final value function
+    """
     horizon = 1
     X = []
     Y = []
@@ -284,9 +354,9 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
             #get_transition_reward(s, horizon, num_samples, i)
             for a in range(num_actions):
                 dir_points = np.asarray(transitions_points[a])
-                
+
                 nomianl_points = []
-    
+
                 for valuefunction in valuefunctions:
                     res = construct_uset_known_value_function(dir_points, valuefunction,\
                                                             confidence)
@@ -323,14 +393,14 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
 ### run experiments
 if __name__ == "__main__":
     # number of sampling steps
-    num_iterations = 5
+    num_iterations = 10
     # number of runs
-    num_simulation = 5
+    num_simulation = 10
     sample_step = 5
     confidence_level = 0.9
     
     #max number of iterations to improve value functions
-    num_update = 5
+    num_update = 10
     
     #(1-overall_confidence) is the total violation allowed. This total violation is distributed among all the state action pairs
     # according to the Union bound.
@@ -369,20 +439,28 @@ if __name__ == "__main__":
         for m in range(Methods.NUM_METHODS.value):
             #if LI_METHODS[m] == Methods.BAYES:
                 #print(Methods.BAYES.value," ", rmdps[m].to_json(), "thresholds: ", thresholds[m])
-            sol = rmdps[m].rsolve_vi("robust_l1".encode(),np.asarray(thresholds[m]))
+            rsol = rmdps[m].rsolve_vi("robust_l1".encode(),np.asarray(thresholds[m]))
+            sol = rmdps[m].solve_vi()
             #print("Method",LI_METHODS[m].value,"value function",sol.valuefunction,"policy",sol.policy)
             if LI_METHODS[m] is Methods.INCR_REPLACE_V:
-                valuefunction = incrementally_replace_V(sol.valuefunction, num_samples,\
+                valuefunction = incrementally_replace_V(rsol.valuefunction, num_samples,\
                                                 num_simulation, num_iterations, sa_confidence)
-                calc_return[m].append(np.dot(initial,valuefunction))
+                calc_return[m].append( np.dot(initial,sol.valuefunction) -\
+                                                np.dot(initial,valuefunction) )
             elif LI_METHODS[m] is Methods.INCR_ADD_V:
-                valuefunction = incrementally_add_V(sol.valuefunction, num_samples,\
+                valuefunction = incrementally_add_V(rsol.valuefunction, num_samples,\
                                                 num_simulation, num_iterations, sa_confidence)
-                calc_return[m].append(np.dot(initial,valuefunction))
+                calc_return[m].append(np.dot(initial,sol.valuefunction) -\
+                                                np.dot(initial,valuefunction))
             else:
-                calc_return[m].append(np.dot(initial,sol.valuefunction))
+                calc_return[m].append( np.dot(initial,sol.valuefunction) -\
+                                                np.dot(initial,rsol.valuefunction))
 
 ### Plot results
 print(calc_return)
-generic_plot(sample_steps, calc_return, "Number of samples", "Total expected return \n (initial distribution x valuefunction)")
+#generic_plot(sample_steps, calc_return, "Number of samples", "Total expected return \n (initial distribution x valuefunction)")
+
+generic_plot(sample_steps, calc_return, "Number of samples", 'Calculated return error', figure_name="Generic_plot_Return_Error.pdf")
+
+
 
