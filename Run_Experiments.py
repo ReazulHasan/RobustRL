@@ -68,12 +68,16 @@ if __name__ == "__main__":
     
     sample_steps = np.arange(sample_step,sample_step*num_iterations+1, step = sample_step)
     
+    #for pos, i in enumerate(tqdm.tqdm(sample_steps)):
+        #gauss_results.append(evaluate_gaussian_uncertainty(i, confidence_level, runs, value_function, value_function, [value_function], min_demand, max_demand))
+        
     for pos, i in enumerate(tqdm.tqdm(sample_steps)):
-        gauss_results.append(evaluate_gaussian_uncertainty(i, confidence_level, runs, value_function, value_function, [value_function], min_demand, max_demand))
+        gauss_results.append(evaluate_gaussian_uncertainty(i, confidence_level, runs, value_function, min_demand, max_demand))
+ 
     
 ### Plot Gaussian Results
 if __name__ == "__main__":
-    compare_methods = [Methods.BAYES, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.KNOWNV, Methods.IMPROVEV, Methods.ADDRANDOMV]
+    compare_methods = [Methods.BAYES, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.INCR_REPLACE_V, Methods.INCR_ADD_V]
     plot_returns(gauss_results, sample_steps, compare_methods, "gaussian_return_single_state.pdf", runs)
     #plot_thresholds(gauss_results, sample_steps, [Methods.HOEFF, Methods.HOEFFTIGHT],"gaussian_threhold_hoeff_vs_tight.pdf", runs)
     #plot_violations(gauss_results, sample_steps, [Methods.HOEFF, Methods.HOEFFTIGHT, Methods.KNOWNV],"gaussian_violations_hoeff_vs_tight.pdf")

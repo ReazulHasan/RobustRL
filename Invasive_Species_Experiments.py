@@ -54,18 +54,6 @@ def get_Bootstrapped_transition_kernel(current_population, horizon, num_samples,
     #print("len(transitions_points[0])",len(transitions_points[0][0]))
     return transitions_points#, rewards
 
-def calc_reward(next_state, trp_to_next_state, action):
-    """
-    Compute the reward for the next state & action.
-    
-    @next_state The next state in the transition
-    @trp_to_next_state Transition probability for the next state
-    @action The action taken
-    
-    @return reward Computed reward
-    """
-    return next_state*trp_to_next_state*(-1) + action * (-4000)
-
 ### Bayesian approach to construct uncertainty set
 
 def get_Bayesian_transition_kernel(current_population, num_samples):
@@ -91,7 +79,7 @@ def get_Bayesian_transition_kernel(current_population, num_samples):
         true_growth_rate_mean = np.random.normal(growth_rate_mean_prior_mean,\
                                                         growth_rate_mean_prior_std)
         #let's take the same prior & true std for simplicity
-        true_growth_rate_std = growth_rate_mean_prior_std 
+        true_growth_rate_std = growth_rate_mean_prior_std
         
         #Here, growth rate is a normally distributed random variable & the product with
         #current_population defines the next states. We discretize the distribution over the 
@@ -125,6 +113,18 @@ def get_Bayesian_transition_kernel(current_population, num_samples):
     
 #print(get_Bayesian_transition_kernel(10, 5))
 
+def calc_reward(next_state, trp_to_next_state, action):
+    """
+    Compute the reward for the next state & action.
+    
+    @next_state The next state in the transition
+    @trp_to_next_state Transition probability for the next state
+    @action The action taken
+    
+    @return reward Computed reward
+    """
+    return next_state*trp_to_next_state*(-1) + action * (-4000)
+    
 ### Construct a boostrapped MDP, solve it, find an arbitrary policy
 if __name__ == "__main__":
     seed = np.random.randint(num_runs)

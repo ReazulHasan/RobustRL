@@ -129,7 +129,8 @@ def evaluate_bayesian_uncertainty(num_points, num_next_states, reward, confidenc
             (Methods.HOEFF, np.mean(np.maximum(0,hoeff_ret_err)), np.mean(hoeff_th), np.mean(hoeff_ret_err < 0), np.mean(hoeff_ret), np.std(np.maximum(0,hoeff_ret_err)), np.std(hoeff_th) ),\
             (Methods.HOEFFTIGHT, np.mean(np.maximum(0,tight_hoeff_ret_err)), np.mean(tight_hoeff_th), np.mean(tight_hoeff_ret_err < 0), np.mean(tight_hoeff_ret), np.std(np.maximum(0,tight_hoeff_ret_err)), np.std(tight_hoeff_th)),\
             (Methods.EM, np.mean(np.maximum(0,em_ret_err)), np.mean(em_th), np.mean(em_ret_err < 0), np.mean(em_ret), np.std(np.maximum(0,em_ret_err)), np.std(em_th) ),\
-            (Methods.KNOWNV, np.mean(np.maximum(0,knownV_ret_err)), np.mean(knownV_th), np.mean(knownV_ret_err<0), np.mean(knownV_ret), np.std(np.maximum(0,knownV_ret_err)), np.std(knownV_th))]
+            (Methods.INCR_REPLACE_V, np.mean(np.maximum(0,knownV_ret_err)), np.mean(knownV_th), np.mean(knownV_ret_err<0), np.mean(knownV_ret), np.std(np.maximum(0,knownV_ret_err)), np.std(knownV_th)),\
+            (Methods.INCR_ADD_V, np.mean(np.maximum(0,knownV_ret_err)), np.mean(knownV_th), np.mean(knownV_ret_err<0), np.mean(knownV_ret), np.std(np.maximum(0,knownV_ret_err)), np.std(knownV_th))]
             
             
 
