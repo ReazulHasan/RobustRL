@@ -84,7 +84,7 @@ def plot_violations(results_dir, sample_steps, compare_methods, figure_name="Vio
     plt.show()
     
 # The generic method to plot data. First param is the x axis, second is a list of y axis data
-def generic_plot(X, Data, x_lab="x axis", y_lab="y axis", legend_pos="upper right", plot_title = "", figure_name="Generic_Plot.pdf"):
+def generic_plot(X, Data, x_lab="x axis", y_lab="y axis", legend_pos="lower right", plot_title = "", figure_name="Generic_Plot.pdf"):
     plt.figure(num=1, figsize=(fig_height, fig_width), dpi=80, facecolor='w', edgecolor='k')
     for method_index in range(Methods.NUM_METHODS.value):
         if LI_METHODS[method_index] is Methods.EM:
