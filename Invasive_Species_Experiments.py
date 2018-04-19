@@ -68,6 +68,7 @@ def get_Bayesian_transition_kernel(current_population, num_samples):
     @return transition_points Transition points for all the actions
     """
     bayes_samples = 300
+    prior_transition_points = {}
     transitions_points = {}#[[] for _ in range(num_actions)]
     if current_population==0:
         current_population=1
@@ -99,6 +100,9 @@ def get_Bayesian_transition_kernel(current_population, num_samples):
         true_distribution = discretize_gaussian(min_population, carrying_capacity,\
                                         true_population_mean, true_population_std)
         
+        prior_points = np.array([discretize_gaussian(min_population, carrying_capacity,\
+                    true_population_mean, true_population_std) for k in range(bayes_samples)])
+        
         mult = np.random.multinomial(num_samples, true_distribution)
         
         estmean_population_mean, estmean_population_std = normal_aposteriori(population, mult, \
@@ -108,9 +112,10 @@ def get_Bayesian_transition_kernel(current_population, num_samples):
                     np.random.normal(estmean_population_mean, estmean_population_std),\
                     true_population_std) for k in range(bayes_samples)])
         
+        prior_transition_points[action] = prior_points
         transitions_points[action] = dir_points
         #print(dir_points)
-    return transitions_points
+    return transitions_points, prior_transition_points
 
 #start_time = time.time()
 #for i in range(250):
@@ -200,6 +205,7 @@ def evaluate_uncertainty_set(current_population, num_samples, num_simulation, va
     incrementallyAddV_th = np.zeros((num_actions, num_simulation))
     
     bayes_nominalPoints = [[] for _ in range(num_actions)]
+    hoeff_nominalPoints = [[] for _ in range(num_actions)]
     em_nominalPoints = [[] for _ in range(num_actions)]
     knownV_nominalPoints = [[] for _ in range(num_actions)]
     incrementallyReplaceV_nominalPoints = [[] for _ in range(num_actions)]
@@ -209,10 +215,14 @@ def evaluate_uncertainty_set(current_population, num_samples, num_simulation, va
         
         #transitions_points = get_Bootstrapped_transition_reward(current_population, \
                                                 #horizon, num_samples, i)
-        transitions_points = get_Bayesian_transition_kernel(current_population, num_samples)
+        #transition_points are sampled points drawn from the posterior for Bayesian case. prior_points
+        #are sampled points drawn from the prior, which is used as the nominal point for 
+        #Hoeffding/Tight etc.
+        transitions_points, prior_transition_points = get_Bayesian_transition_kernel(current_population, num_samples)
         
         for a in range(num_actions):
             dir_points = np.asarray(transitions_points[a])
+            prior_dir_points = np.asarray(prior_transition_points[a])
             
             #print("dir_points.shape",dir_points[0].shape, dir_points[0])
             
@@ -224,6 +234,11 @@ def evaluate_uncertainty_set(current_population, num_samples, num_simulation, va
             #get uncertainty set & threshold
             bayes_th[a,i] = compute_bayesian_threshold(dir_points,nominal_prob_bayes,\
                                 confidence_level)        
+
+            nominal_prob_hoeff = np.mean(prior_dir_points, axis=0)
+            nominal_prob_hoeff /= np.sum(nominal_prob_hoeff)
+            
+            hoeff_nominalPoints[a].append(nominal_prob_hoeff)
             
             #calc threshold from hoeffding bound equation
             hoeff_th[a,i] = np.sqrt((2 / num_samples )*np.log((2**num_next_states-2) \
@@ -253,10 +268,10 @@ def evaluate_uncertainty_set(current_population, num_samples, num_simulation, va
     return [(Methods.BAYES, np.mean(bayes_th, axis=1), np.std(bayes_th, axis=1),\
                 np.mean(bayes_nominalPoints, axis=1) ),\
             (Methods.HOEFF, np.mean(hoeff_th, axis=1), np.std(hoeff_th, axis=1),\
-                np.mean(bayes_nominalPoints, axis=1) ),\
+                np.mean(hoeff_nominalPoints, axis=1) ),\
             (Methods.HOEFFTIGHT, np.mean(tight_hoeff_th, axis=1),\
                 np.std(tight_hoeff_th, axis=1),\
-                np.mean(bayes_nominalPoints, axis=1)),\
+                np.mean(hoeff_nominalPoints, axis=1)),\
             (Methods.EM, np.mean(em_th, axis=1), np.std(em_th, axis=1),\
                 np.mean(em_nominalPoints, axis=1) ),\
             (Methods.INCR_REPLACE_V, np.mean(incrementallyReplaceV_th, axis=1),\
@@ -291,7 +306,7 @@ def incrementally_replace_V(valuefunction, num_samples, num_simulation,\
     for s in population:
         #transitions_points = get_Bootstrapped_transition_reward(s, horizon,\
                                         #num_samples, np.random.randint(len(population)))
-        transitions_points = get_Bayesian_transition_kernel(s, num_samples)
+        transitions_points, _ = get_Bayesian_transition_kernel(s, num_samples)
         list_transitions_points[s] = transitions_points
     
     regret = 99999
@@ -358,7 +373,7 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
     for s in population:
         #transitions_points = get_Bootstrapped_transition_reward(s, horizon,\
                                         #num_samples, np.random.randint(len(population)))
-        transitions_points = get_Bayesian_transition_kernel(s, num_samples)
+        transitions_points, _ = get_Bayesian_transition_kernel(s, num_samples)
         list_transitions_points[s] = transitions_points
     
     #Store the nominal points for each state-action pairs
