@@ -7,7 +7,7 @@ import numpy as np
 import tqdm
 import time
 
-horizon, num_runs = 20, 20
+horizon, num_runs = 100, 500
 min_population, carrying_capacity = 0, 20
 initial_population = int(carrying_capacity/3)#np.random.randint(min_population, carrying_capacity)
 mean_growth_rate, std_growth_rate, std_observation = 1.1, 0.4, 2
@@ -128,7 +128,7 @@ def calc_reward(next_state, trp_to_next_state, action):
     
     @return reward Computed reward
     """
-    return next_state*trp_to_next_state*(-1) + action * (-4000)
+    return next_state*trp_to_next_state*(-1) + action * (-1)
     
 ### Construct a boostrapped MDP, solve it, find an arbitrary policy
 if __name__ == "__main__":
@@ -149,7 +149,7 @@ if __name__ == "__main__":
     smdp.add_samples(samples)
     mdp = smdp.get_mdp(discount_factor)
     '''
-    mdp = crobust.MDP(0, discount_factor)
+    est_true_mdp = crobust.MDP(0, discount_factor)
     for s in population:
         transitions_points = get_Bootstrapped_transition_kernel(s, horizon, 1, s)
         for a in range(num_actions):
@@ -157,16 +157,19 @@ if __name__ == "__main__":
             
             for next_st in population:
                 reward = calc_reward(next_st, trp[int(next_st)], a)
-                mdp.add_transition(s, a, next_st, trp[int(next_st)], reward)
+                est_true_mdp.add_transition(s, a, next_st, trp[int(next_st)], reward)
     
-    orig_sol = mdp.solve_vi()
+    orig_sol = est_true_mdp.solve_mpi()
     orig_policy = orig_sol.policy
     
+    #print("MDP",est_true_mdp.to_json())
+    print("value function",orig_sol.valuefunction,"policy",orig_policy)
     #print(len(orig_policy))
     random_policy = np.random.randint(2, size=(carrying_capacity-min_population+1))
-    arbitrary_valuefunction = mdp.solve_vi(policy=random_policy).valuefunction#rewards_vec(random_policy)
+    arbitrary_valuefunction = est_true_mdp.solve_vi(policy=random_policy).valuefunction
+    print("arbitrary_valuefunction",arbitrary_valuefunction)
     
-    print(arbitrary_valuefunction)
+    #print(arbitrary_valuefunction)
     initial = np.ones(carrying_capacity-min_population+1)/(carrying_capacity-min_population+1)
     #print(initial)
     #print(np.dot(initial,orig_sol.valuefunction))
@@ -300,8 +303,7 @@ def incrementally_replace_V(valuefunction, num_samples, num_simulation,\
             transitions_points = list_transitions_points[s] #get_Bayesian_transition_kernel(s, num_samples)
             for a in range(num_actions):
                 dir_points = np.asarray(transitions_points[a])
-                res = construct_uset_known_value_function(dir_points, valuefunction,\
-                                                            confidence)
+                res = construct_uset_known_value_function(dir_points, valuefunction, confidence)
                 
                 threshold[0].append(s)
                 threshold[1].append(a)
@@ -312,12 +314,15 @@ def incrementally_replace_V(valuefunction, num_samples, num_simulation,\
                 for next_st in population:
                     reward = calc_reward(next_st, trp[int(next_st)], a)
                     rmdp.add_transition(s, a, next_st, trp[int(next_st)], reward)
-                
-        rsol = rmdp.rsolve_vi("robust_l1".encode(),threshold)
-        sol = rmdp.solve_vi()
-        cur_regret = np.dot(initial,sol.valuefunction) - np.dot(initial,rsol.valuefunction)
+        
+        rsol = rmdp.rsolve_mpi(b"robust_l1",threshold)
+        rpolicy = rsol.policy        
+        #rret = rmdp.solve_mpi(policy=rpolicy)
+        ret = est_true_mdp.solve_mpi(policy=rpolicy)
+        cur_regret = np.dot(initial,ret.valuefunction) - np.dot(initial,rsol.valuefunction)
         if cur_regret>regret:
             break
+        #print(i, "regret", regret, "cur_regret", cur_regret)
         regret = cur_regret
         valuefunction = rsol.valuefunction
         X.append(i)
@@ -329,7 +334,7 @@ def incrementally_replace_V(valuefunction, num_samples, num_simulation,\
 
 ###
 def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
-                                                        num_update, sa_confidence):
+                                                    num_update, sa_confidence):
     """
     Method to incrementally improve value function by adding the new value function with 
     previous valuefunctions, finding the nominal point & threshold for this cluster of value functions
@@ -388,14 +393,13 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
                 #If there's a previously constructed L1 ball. Check whether the new nominal point
                 #needs to be considered.
                 if (s,a) in nominal_threshold:
-                    old_trp = nominal_threshold[(s,a)][0]
-                    old_th = nominal_threshold[(s,a)][1]
+                    old_trp, old_th = nominal_threshold[(s,a)][0], nominal_threshold[(s,a)][1]
                     
                     #Compute the L1 distance between the newly computed nominal point & the previous 
                     #nominal of nominal points
                     new_th = np.linalg.norm(res[2] - old_trp, ord = 1)
                     
-                    #The new point is inside the previous L1 ball. Don't consider it & proceed with
+                    #If the new point is inside the previous L1 ball, don't consider it & proceed with
                     #the previous trp & threshold
                     if  (new_th - old_th) < 0.0001:
                         trp, th = old_trp, old_th
@@ -408,7 +412,7 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
                     is_mdp_unchanged = False
                     nomianl_points[(s,a)].append(res[2])
                     
-                    start_time = time.time()
+                    #start_time = time.time()
                     #Find the center of the L1 ball for the nominal points with different 
                     #value functions
                     trp, th = find_nominal_point(np.asarray(nomianl_points[(s,a)]))
@@ -425,14 +429,23 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
                     reward = calc_reward(next_st, trp[int(next_st)], a)
                     rmdp.add_transition(s, a, next_st, trp[int(next_st)], reward)
         
-        rsol = rmdp.rsolve_vi("robust_l1".encode(),threshold)
+        rsol = rmdp.rsolve_mpi(b"robust_l1",threshold)
         
         #If the whole MDP is unchanged, meaning the new value function didn't change the uncertanty
         #set for any state-action, no need to iterate more!
-        if is_mdp_unchanged or i==num_update:
-            #print("MDP remains unchanged after number of iteration:",i)
-            sol = rmdp.solve_vi()
-            regret = np.dot(initial,sol.valuefunction) - np.dot(initial,rsol.valuefunction)
+        if is_mdp_unchanged or i==num_update-1:
+            print("**** Add Values *****")
+            print("MDP remains unchanged after number of iteration:",i)
+            print("Policy",rsol.policy, "threshold", threshold)
+            #print("MDP",rmdp.to_json())
+            #print("Threshold",threshold[2])
+            rpolicy = rsol.policy
+            
+            #rret = rmdp.solve_mpi(policy=rpolicy)
+            ret = est_true_mdp.solve_mpi(policy=rpolicy)
+            #print("rret",rret,"ret",ret)
+            #np.dot(initial,sol.valuefunction)
+            regret = np.dot(initial,ret.valuefunction) - np.dot(initial,rsol.valuefunction)
             break
 
         valuefunction = rsol.valuefunction
@@ -450,10 +463,10 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
 ### run experiments
 if __name__ == "__main__":
     # number of sampling steps
-    num_iterations = 10
+    num_iterations = 3
     # number of runs
-    num_simulation = 10
-    sample_step = 5
+    num_simulation = 1
+    sample_step = 3
     confidence_level = 0.9
     
     #max number of iterations to improve value functions
@@ -500,8 +513,8 @@ if __name__ == "__main__":
                 continue
             #if LI_METHODS[m] == Methods.BAYES:
                 #print(Methods.BAYES.value," ", rmdps[m].to_json(), "thresholds: ", thresholds[m])
-            rsol = rmdps[m].rsolve_vi("robust_l1".encode(),np.asarray(thresholds[m]))
-            sol = rmdps[m].solve_vi()
+            rsol = rmdps[m].rsolve_mpi(b"robust_l1",np.asarray(thresholds[m]))
+            sol = est_true_mdp.solve_mpi()
             #print("Method",LI_METHODS[m].value,"value function",sol.valuefunction,"policy",sol.policy)
             if LI_METHODS[m] is Methods.INCR_REPLACE_V:
                 regret = incrementally_replace_V(rsol.valuefunction, num_samples,\
