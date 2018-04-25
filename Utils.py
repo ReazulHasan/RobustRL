@@ -10,15 +10,16 @@ from scipy import stats
 if __name__ == "__main__":
     class Methods(Enum):
         BAYES = "Bayes Simple"
+        CENTROID = "Mean Transition Probability"
         HOEFF = "Hoeffding"
         HOEFFTIGHT = "Hoeffding Tight"
         EM = "Expectation Maximization"
         INCR_REPLACE_V = "Incrementally Replace Value Function"
         INCR_ADD_V = "Incrementally Add Value Function"
         
-        NUM_METHODS = 6 #Number of methods
+        NUM_METHODS = 7 #Number of methods
     
-    LI_METHODS = [Methods.BAYES, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.EM,\
+    LI_METHODS = [Methods.BAYES, Methods.CENTROID, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.EM,\
                     Methods.INCR_REPLACE_V, Methods.INCR_ADD_V]
 
 ###Process Gaussian distribution
@@ -195,7 +196,7 @@ def calc_EM_rand(points, confidence_level, nominal_p):
         if(next_psi < new_psi):
             new_psi = next_psi
             new_nominal = next_nominal
-            
+
     return new_nominal, new_psi
 
 ### Construct Uset for known value function

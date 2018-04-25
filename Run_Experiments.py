@@ -6,7 +6,6 @@ import Plot
 import numpy as np
 import tqdm
 
-
 ### Run Bayesian Experiments
 if __name__ == "__main__":
     # number of assumes states in the MDP

@@ -87,7 +87,7 @@ def plot_violations(results_dir, sample_steps, compare_methods, figure_name="Vio
 def generic_plot(X, Data, x_lab="x axis", y_lab="y axis", legend_pos="lower right", plot_title = "", figure_name="Generic_Plot.pdf"):
     plt.figure(num=1, figsize=(fig_height, fig_width), dpi=80, facecolor='w', edgecolor='k')
     for method_index in range(Methods.NUM_METHODS.value):
-        if LI_METHODS[method_index] is Methods.EM:
+        if LI_METHODS[method_index] is Methods.EM or LI_METHODS[method_index] is Methods.INCR_REPLACE_V:
             continue
         plt.plot(X, Data[method_index], linestyle=lineStyles[method_index%num_styles], marker=markers[method_index%num_markers], alpha=0.7, label = LI_METHODS[method_index].value)
 

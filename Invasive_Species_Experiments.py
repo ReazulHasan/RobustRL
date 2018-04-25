@@ -9,13 +9,14 @@ import time
 
 horizon, num_runs = 100, 500
 min_population, carrying_capacity = 0, 20
-initial_population = int(carrying_capacity/3)#np.random.randint(min_population, carrying_capacity)
+initial_population = int(carrying_capacity/3) #np.random.randint(min_population, carrying_capacity)
 mean_growth_rate, std_growth_rate, std_observation = 1.1, 0.4, 2
 beta_1, beta_2, n_hat = 0.001, -0.0000021, int(carrying_capacity*2/3)
 threshold_control, prob_control, seed = 0, 0.5, 5
-discount_factor = 0.9
+discount_factor, eps = 0.9, 0.00001
 num_samples, num_actions = 20, 2
 population = np.arange(min_population, carrying_capacity + 1, dtype=np.double)
+initial = np.ones(carrying_capacity-min_population+1)/(carrying_capacity-min_population+1)
 
 ### Construct uncertainty set for each state-action
 
@@ -134,50 +135,6 @@ def calc_reward(next_state, trp_to_next_state, action):
     @return reward Computed reward
     """
     return next_state*trp_to_next_state*(-1) + action * (-1)
-    
-### Construct a boostrapped MDP, solve it, find an arbitrary policy
-if __name__ == "__main__":
-    seed = np.random.randint(num_runs)
-    #initial_population = 30
-    '''
-    species_simulator = crobust.SimulatorSpecies(initial_population, carrying_capacity,\
-                mean_growth_rate, std_growth_rate, std_observation, beta_1, beta_2, n_hat,\
-                threshold_control, prob_control, seed)
-    samples = species_simulator.simulate_species(horizon, num_runs)
-    
-    states_from = samples.get_states_from()
-    actions = samples.get_actions()
-    states_to = samples.get_states_to()
-    rewards = samples.get_rewards()
-    
-    smdp = crobust.SampledMDP()
-    smdp.add_samples(samples)
-    mdp = smdp.get_mdp(discount_factor)
-    '''
-    est_true_mdp = crobust.MDP(0, discount_factor)
-    for s in population:
-        transitions_points = get_Bootstrapped_transition_kernel(s, horizon, 1, s)
-        for a in range(num_actions):
-            trp = transitions_points[a][0]
-            
-            for next_st in population:
-                reward = calc_reward(next_st, trp[int(next_st)], a)
-                est_true_mdp.add_transition(s, a, next_st, trp[int(next_st)], reward)
-    
-    orig_sol = est_true_mdp.solve_mpi()
-    orig_policy = orig_sol.policy
-    
-    #print("MDP",est_true_mdp.to_json())
-    print("value function",orig_sol.valuefunction,"policy",orig_policy)
-    #print(len(orig_policy))
-    random_policy = np.random.randint(2, size=(carrying_capacity-min_population+1))
-    arbitrary_valuefunction = est_true_mdp.solve_vi(policy=random_policy).valuefunction
-    print("arbitrary_valuefunction",arbitrary_valuefunction)
-    
-    #print(arbitrary_valuefunction)
-    initial = np.ones(carrying_capacity-min_population+1)/(carrying_capacity-min_population+1)
-    #print(initial)
-    #print(np.dot(initial,orig_sol.valuefunction))
 
 ###
 def evaluate_uncertainty_set(current_population, num_samples, num_simulation, value_function, confidence_level):
@@ -222,8 +179,9 @@ def evaluate_uncertainty_set(current_population, num_samples, num_simulation, va
         
         for a in range(num_actions):
             dir_points = np.asarray(transitions_points[a])
-            prior_dir_points = np.asarray(prior_transition_points[a])
+            prior_dir_points = np.asarray(prior_transition_points[a]) + eps
             
+            #print("prior_dir_points",np.sum(prior_dir_points,axis=1))
             #print("dir_points.shape",dir_points[0].shape, dir_points[0])
             
             nominal_prob_bayes = np.mean(dir_points, axis=0)
@@ -267,6 +225,8 @@ def evaluate_uncertainty_set(current_population, num_samples, num_simulation, va
     
     return [(Methods.BAYES, np.mean(bayes_th, axis=1), np.std(bayes_th, axis=1),\
                 np.mean(bayes_nominalPoints, axis=1) ),\
+            (Methods.CENTROID, [0 for _ in range(num_actions)], [0 for _ in range(num_actions)],\
+                np.mean(hoeff_nominalPoints, axis=1) ),\
             (Methods.HOEFF, np.mean(hoeff_th, axis=1), np.std(hoeff_th, axis=1),\
                 np.mean(hoeff_nominalPoints, axis=1) ),\
             (Methods.HOEFFTIGHT, np.mean(tight_hoeff_th, axis=1),\
@@ -285,7 +245,7 @@ def evaluate_uncertainty_set(current_population, num_samples, num_simulation, va
 
 ###
 def incrementally_replace_V(valuefunction, num_samples, num_simulation,\
-                                                        num_update, sa_confidence):
+                                                        num_update, sa_confidence, orig_sol):
     """
     Method to incrementally improve the value function by replacing the old value function with 
     the new one.
@@ -309,7 +269,8 @@ def incrementally_replace_V(valuefunction, num_samples, num_simulation,\
         transitions_points, _ = get_Bayesian_transition_kernel(s, num_samples)
         list_transitions_points[s] = transitions_points
     
-    regret = 99999
+    under_estimate = 99999
+    real_regret = 0.0
     for i in range(num_update):
         threshold = [[] for _ in range(3)]
         rmdp = crobust.MDP(0, discount_factor)
@@ -335,21 +296,23 @@ def incrementally_replace_V(valuefunction, num_samples, num_simulation,\
         #rret = rmdp.solve_mpi(policy=rpolicy)
         ret = est_true_mdp.solve_mpi(policy=rpolicy)
         cur_regret = np.dot(initial,ret.valuefunction) - np.dot(initial,rsol.valuefunction)
-        if cur_regret>regret:
+        if cur_regret>under_estimate:
+            #ropt_sol = est_true_mdp.solve_mpi(policy=rpolicy)
+            real_regret = np.dot(initial,orig_sol.valuefunction) -\
+                                                np.dot(initial,ret.valuefunction)
             break
-        #print(i, "regret", regret, "cur_regret", cur_regret)
-        regret = cur_regret
+
+        under_estimate = cur_regret
         valuefunction = rsol.valuefunction
         X.append(i)
         Y.append(valuefunction[0])
-    #print(X, Y)
-    #simple_generic_plot(X, Y, "Number of samples", "Returned value to initial state")
-    return regret #valuefunction
+
+    return under_estimate, real_regret
 #incrementally_replace_V(arbitrary_valuefunction, 5, 5, 5, 0.9)
 
 ###
 def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
-                                                    num_update, sa_confidence):
+                                                    num_update, sa_confidence, orig_sol):
     """
     Method to incrementally improve value function by adding the new value function with 
     previous valuefunctions, finding the nominal point & threshold for this cluster of value functions
@@ -381,8 +344,8 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
     
     #Store the latest nominal of nominal point & threshold
     nominal_threshold = {}
-    regret = 0
-    print(num_update)
+    under_estimate, real_regret = 0.0, 0.0
+    
     for i in range(num_update):
         #print("valuefunctions",i,": ",valuefunctions)
         #keep track whether the current iteration keeps the mdp unchanged
@@ -452,36 +415,32 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
             print("**** Add Values *****")
             print("MDP remains unchanged after number of iteration:",i)
             print("Policy",rsol.policy, "threshold", threshold)
-            #print("MDP",rmdp.to_json())
-            #print("Threshold",threshold[2])
+
             rpolicy = rsol.policy
-            
-            #rret = rmdp.solve_mpi(policy=rpolicy)
             ret = est_true_mdp.solve_mpi(policy=rpolicy)
-            #print("rret",rret,"ret",ret)
-            #np.dot(initial,sol.valuefunction)
-            regret = np.dot(initial,ret.valuefunction) - np.dot(initial,rsol.valuefunction)
+            under_estimate = np.dot(initial,ret.valuefunction) - np.dot(initial,rsol.valuefunction)
+            
+            #ropt_sol = rmdp.solve_mpi(policy=orig_sol.policy)
+            real_regret = np.dot(initial,orig_sol.valuefunction) -\
+                                                np.dot(initial,ret.valuefunction)
             break
 
         valuefunction = rsol.valuefunction
         valuefunctions.append(valuefunction)
         X.append(i)
         Y.append(valuefunction[0])
-    #print("valuefunctions",valuefunctions)
-    #print("Incrementally add V", "threshold: ", threshold)
-    #print(X, Y)
-    #simple_generic_plot(X, Y, "Number of samples", "Returned value to initial state")
-    return regret #valuefunctions[-1]
+
+    return under_estimate, real_regret
 
 #incrementally_add_V(arbitrary_valuefunction, 30, 10, 10, 0.9)
 
 ### run experiments
 if __name__ == "__main__":
     # number of sampling steps
-    num_iterations = 3
+    num_iterations = 5
     # number of runs
-    num_simulation = 1
-    sample_step = 3
+    num_simulation = 20
+    sample_step = 5
     confidence_level = 0.9
     
     #max number of iterations to improve value functions
@@ -491,12 +450,33 @@ if __name__ == "__main__":
     # according to the Union bound.
     sa_confidence = 1 - ( (1 - confidence_level) / (num_actions * (carrying_capacity-min_population+1)) )
     
+    #Construct the estimated true MDP by taking a lot of samples.
+    seed = np.random.randint(num_runs)
+    est_true_mdp = crobust.MDP(0, discount_factor)
+    for s in population:
+        transitions_points = get_Bootstrapped_transition_kernel(s, horizon, 1, s)
+        for a in range(num_actions):
+            trp = transitions_points[a][0]
+            
+            for next_st in population:
+                reward = calc_reward(next_st, trp[int(next_st)], a)
+                est_true_mdp.add_transition(s, a, next_st, trp[int(next_st)], reward)
+    
+    orig_sol = est_true_mdp.solve_mpi()
+    orig_policy = orig_sol.policy
+    
+    random_policy = np.random.randint(2, size=(carrying_capacity-min_population+1))
+    arbitrary_valuefunction = est_true_mdp.solve_vi(policy=random_policy).valuefunction
+    
     sample_steps = np.arange(sample_step,sample_step*num_iterations+1, step = sample_step)
     
     #In thresholds, the first dimension is methods (e.g Bayesian, EM etc.)
     #for each method, there are 3 lists containing state-action-threshold packed into a list
     thresholds = [ [[] for _ in range(3)] for _ in range(Methods.NUM_METHODS.value) ]
-    calc_return = [[] for _ in range(Methods.NUM_METHODS.value)]
+    under_estimation = [[] for _ in range(Methods.NUM_METHODS.value)] #estimated regret
+    real_regret = [[] for _ in range(Methods.NUM_METHODS.value)] #optimal regret
+    
+    #sol = est_true_mdp.solve_mpi()
     
     for pos, num_samples in enumerate(tqdm.tqdm(sample_steps)):        
         rmdps = []
@@ -529,25 +509,31 @@ if __name__ == "__main__":
             #if LI_METHODS[m] == Methods.BAYES:
                 #print(Methods.BAYES.value," ", rmdps[m].to_json(), "thresholds: ", thresholds[m])
             rsol = rmdps[m].rsolve_mpi(b"robust_l1",np.asarray(thresholds[m]))
-            sol = est_true_mdp.solve_mpi()
-            #print("Method",LI_METHODS[m].value,"value function",sol.valuefunction,"policy",sol.policy)
+
             if LI_METHODS[m] is Methods.INCR_REPLACE_V:
-                regret = incrementally_replace_V(rsol.valuefunction, num_samples,\
-                                                num_simulation, num_update, sa_confidence)
-                calc_return[m].append(regret)
+                u_estimate, regret = incrementally_replace_V(rsol.valuefunction, num_samples,\
+                                                num_simulation, num_update, sa_confidence, orig_sol)
+                under_estimation[m].append(u_estimate)
+                real_regret[m].append(regret)
             elif LI_METHODS[m] is Methods.INCR_ADD_V:
-                regret = incrementally_add_V(rsol.valuefunction, num_samples,\
-                                                num_simulation, num_update, sa_confidence)
-                calc_return[m].append(regret)
+                u_estimate, regret = incrementally_add_V(rsol.valuefunction, num_samples,\
+                                                num_simulation, num_update, sa_confidence, orig_sol)
+                under_estimation[m].append(u_estimate)
+                real_regret[m].append(regret)
             else:
-                calc_return[m].append( np.dot(initial,sol.valuefunction) -\
+                under_estimation[m].append( np.dot(initial,orig_sol.valuefunction) -\
                                                 np.dot(initial,rsol.valuefunction))
+                ropt_sol = est_true_mdp.solve_mpi(policy=rsol.policy)
+                real_regret[m].append( np.dot(initial,orig_sol.valuefunction) -\
+                                                np.dot(initial,ropt_sol.valuefunction))
 
 ### Plot results
 print(calc_return)
 #generic_plot(sample_steps, calc_return, "Number of samples", "Total expected return \n (initial distribution x valuefunction)")
 
-generic_plot(sample_steps, calc_return, "Number of samples", 'Calculated return error', legend_pos="upper right", figure_name="Generic_plot_Return_Error.pdf")
+generic_plot(sample_steps, under_estimation, "Number of samples", 'Calculated return error', legend_pos="upper right", figure_name="Generic_plot_Under_Estimation.pdf")
+
+generic_plot(sample_steps, real_regret, "Number of samples", 'Calculated return error', legend_pos="upper right", figure_name="Generic_plot_True_Regret.pdf")
 
 
 
