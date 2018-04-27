@@ -71,7 +71,8 @@ def evaluate_bayesian_uncertainty(num_points, num_next_states, reward, confidenc
     for i in range(num_simulation):
         # construct the true distribution
         true_distribution = np.random.dirichlet(prior, 1)[0]
-
+        
+        #print(i,"true_distribution",true_distribution)
         # get samples from multinomial distribution
         mult = np.random.multinomial(num_points, true_distribution)
         #print("mult",mult)
@@ -124,6 +125,9 @@ def evaluate_bayesian_uncertainty(num_points, num_next_states, reward, confidenc
         em_ret_err[i] = (true_ret - em_ret[i]) /true_ret
         knownV_ret_err[i] = (true_ret_knownV - knownV_ret[i])/true_ret_knownV
         
+    #bayes_ret_err[0] = -1
+    #print(bayes_ret_err, "bayes_ret_err < 0: ",bayes_ret_err < 0)
+    #print("mean:",np.mean(bayes_ret_err < 0))
     # make sure to not count negative return errors to improve the mena
     return [(Methods.BAYES, np.mean(np.maximum(0,bayes_ret_err)), np.mean(bayes_th), np.mean(bayes_ret_err < 0), np.mean(bayes_ret), np.std(np.maximum(0,bayes_ret_err)), np.std(bayes_th) ),\
             (Methods.HOEFF, np.mean(np.maximum(0,hoeff_ret_err)), np.mean(hoeff_th), np.mean(hoeff_ret_err < 0), np.mean(hoeff_ret), np.std(np.maximum(0,hoeff_ret_err)), np.std(hoeff_th) ),\

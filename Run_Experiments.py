@@ -44,8 +44,8 @@ with open('dumped_results/Bayes_result_'+str(num_next_states)+"_"+str(num_iterat
 if __name__ == "__main__":
     plot_returns(bayes_results, sample_steps, [Methods.BAYES, Methods.HOEFF, Methods.HOEFFTIGHT], "Bayes_return_BHHT.pdf",runs)
     #plot_returns(bayes_results, sample_steps, [Methods.BAYES, Methods.EM, Methods.KNOWNV], "Bayes_return_BEK.pdf",runs)
-    plot_thresholds(bayes_results, sample_steps, [Methods.BAYES, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.EM, Methods.KNOWNV], "Bayes_threshold_comparison.pdf",runs)
-    plot_violations(bayes_results, sample_steps, [Methods.BAYES, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.EM, Methods.KNOWNV], "Bayes_violations_comparison.pdf")
+    plot_thresholds(bayes_results, sample_steps, [Methods.BAYES, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.EM, Methods.INCR_ADD_V], "Bayes_threshold_comparison.pdf",runs)
+    plot_violations(bayes_results, sample_steps, [Methods.BAYES, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.EM, Methods.INCR_ADD_V], "Bayes_violations_comparison.pdf")
 
 
 ### Run Gaussian Experiments

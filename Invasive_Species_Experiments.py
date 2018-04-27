@@ -8,7 +8,7 @@ import tqdm
 import time
 
 horizon, num_runs = 100, 500
-min_population, carrying_capacity = 0, 20
+min_population, carrying_capacity = 0, 6
 initial_population = int(carrying_capacity/3) #np.random.randint(min_population, carrying_capacity)
 mean_growth_rate, std_growth_rate, std_observation = 1.1, 0.4, 2
 beta_1, beta_2, n_hat = 0.001, -0.0000021, int(carrying_capacity*2/3)
@@ -73,6 +73,9 @@ def get_Bayesian_transition_kernel(current_population, num_samples):
     transitions_points = {}#[[] for _ in range(num_actions)]
     if current_population==0:
         current_population=1
+
+    #print("current_population", current_population)
+
     for action in range(num_actions):
         growth_rate_mean_prior_mean = max(0.0, mean_growth_rate - action * \
         current_population * beta_1 - action*max(current_population-n_hat,0)**2 * beta_2 )
@@ -104,18 +107,21 @@ def get_Bayesian_transition_kernel(current_population, num_samples):
         prior_points = np.array([discretize_gaussian(min_population, carrying_capacity,\
                     true_population_mean, true_population_std) for k in range(bayes_samples)])
         
-        mult = np.random.multinomial(num_samples, true_distribution)
+        samples_from_prior = np.random.multinomial(num_samples, true_distribution)
         
-        estmean_population_mean, estmean_population_std = normal_aposteriori(population, mult, \
+        #print("action", action, "samples_from_prior", samples_from_prior, "TRP",\
+        #                samples_from_prior/num_samples, "prior_points", prior_points)
+        
+        estmean_population_mean, estmean_population_std = normal_aposteriori(population, samples_from_prior,\
                             true_population_std, growth_rate_mean_prior_mean, growth_rate_mean_prior_std)
         
-        dir_points = np.array([discretize_gaussian(min_population, carrying_capacity,\
+        posterior_points = np.array([discretize_gaussian(min_population, carrying_capacity,\
                     np.random.normal(estmean_population_mean, estmean_population_std),\
                     true_population_std) for k in range(bayes_samples)])
         
-        prior_transition_points[action] = prior_points
-        transitions_points[action] = dir_points
-        #print(dir_points)
+        prior_transition_points[action] = samples_from_prior/num_samples
+        transitions_points[action] = posterior_points
+        #print(posterior_points)
     return transitions_points, prior_transition_points
 
 #start_time = time.time()
@@ -175,6 +181,7 @@ def evaluate_uncertainty_set(current_population, num_samples, num_simulation, va
         #transition_points are sampled points drawn from the posterior for Bayesian case. prior_points
         #are sampled points drawn from the prior, which is used as the nominal point for 
         #Hoeffding/Tight etc.
+        #print("Ealuate uncertainty set: ",i)
         transitions_points, prior_transition_points = get_Bayesian_transition_kernel(current_population, num_samples)
         
         for a in range(num_actions):
@@ -193,8 +200,8 @@ def evaluate_uncertainty_set(current_population, num_samples, num_simulation, va
             bayes_th[a,i] = compute_bayesian_threshold(dir_points,nominal_prob_bayes,\
                                 confidence_level)        
 
-            nominal_prob_hoeff = np.mean(prior_dir_points, axis=0)
-            nominal_prob_hoeff /= np.sum(nominal_prob_hoeff)
+            nominal_prob_hoeff = prior_dir_points #np.mean(prior_dir_points, axis=0)
+            #nominal_prob_hoeff /= np.sum(nominal_prob_hoeff)
             
             hoeff_nominalPoints[a].append(nominal_prob_hoeff)
             
@@ -266,6 +273,7 @@ def incrementally_replace_V(valuefunction, num_samples, num_simulation,\
     for s in population:
         #transitions_points = get_Bootstrapped_transition_reward(s, horizon,\
                                         #num_samples, np.random.randint(len(population)))
+        #print("Incrementally replace V")
         transitions_points, _ = get_Bayesian_transition_kernel(s, num_samples)
         list_transitions_points[s] = transitions_points
     
@@ -293,6 +301,7 @@ def incrementally_replace_V(valuefunction, num_samples, num_simulation,\
         
         rsol = rmdp.rsolve_mpi(b"robust_l1",threshold)
         rpolicy = rsol.policy        
+        violation = 0
         #rret = rmdp.solve_mpi(policy=rpolicy)
         ret = est_true_mdp.solve_mpi(policy=rpolicy)
         cur_regret = np.dot(initial,ret.valuefunction) - np.dot(initial,rsol.valuefunction)
@@ -300,6 +309,8 @@ def incrementally_replace_V(valuefunction, num_samples, num_simulation,\
             #ropt_sol = est_true_mdp.solve_mpi(policy=rpolicy)
             real_regret = np.dot(initial,orig_sol.valuefunction) -\
                                                 np.dot(initial,ret.valuefunction)
+            violation = 1 if (np.dot(initial, ret.valuefunction) - np.dot(initial,\
+                            rsol.valuefunction))<0 else 0
             break
 
         under_estimate = cur_regret
@@ -307,7 +318,7 @@ def incrementally_replace_V(valuefunction, num_samples, num_simulation,\
         X.append(i)
         Y.append(valuefunction[0])
 
-    return under_estimate, real_regret
+    return under_estimate, real_regret, violation
 #incrementally_replace_V(arbitrary_valuefunction, 5, 5, 5, 0.9)
 
 ###
@@ -336,6 +347,7 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
     for s in population:
         #transitions_points = get_Bootstrapped_transition_reward(s, horizon,\
                                         #num_samples, np.random.randint(len(population)))
+        #print("incrementally add v")
         transitions_points, _ = get_Bayesian_transition_kernel(s, num_samples)
         list_transitions_points[s] = transitions_points
     
@@ -406,9 +418,11 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
                 for next_st in population:
                     reward = calc_reward(next_st, trp[int(next_st)], a)
                     rmdp.add_transition(s, a, next_st, trp[int(next_st)], reward)
-        
+
         rsol = rmdp.rsolve_mpi(b"robust_l1",threshold)
         
+        violation = 0
+
         #If the whole MDP is unchanged, meaning the new value function didn't change the uncertanty
         #set for any state-action, no need to iterate more!
         if is_mdp_unchanged or i==num_update-1:
@@ -423,6 +437,10 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
             #ropt_sol = rmdp.solve_mpi(policy=orig_sol.policy)
             real_regret = np.dot(initial,orig_sol.valuefunction) -\
                                                 np.dot(initial,ret.valuefunction)
+                                                
+            violation = 1 if (np.dot(initial, ret.valuefunction) - np.dot(initial,\
+                            rsol.valuefunction))<0 else 0
+                                                
             break
 
         valuefunction = rsol.valuefunction
@@ -430,7 +448,7 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
         X.append(i)
         Y.append(valuefunction[0])
 
-    return under_estimate, real_regret
+    return under_estimate, real_regret, violation
 
 #incrementally_add_V(arbitrary_valuefunction, 30, 10, 10, 0.9)
 
@@ -439,8 +457,8 @@ if __name__ == "__main__":
     # number of sampling steps
     num_iterations = 5
     # number of runs
-    num_simulation = 20
-    sample_step = 5
+    num_simulation = 5
+    sample_step = 2
     confidence_level = 0.9
     
     #max number of iterations to improve value functions
@@ -475,6 +493,7 @@ if __name__ == "__main__":
     thresholds = [ [[] for _ in range(3)] for _ in range(Methods.NUM_METHODS.value) ]
     under_estimation = [[] for _ in range(Methods.NUM_METHODS.value)] #estimated regret
     real_regret = [[] for _ in range(Methods.NUM_METHODS.value)] #optimal regret
+    violations = [[] for _ in range(Methods.NUM_METHODS.value)]
     
     #sol = est_true_mdp.solve_mpi()
     
@@ -511,29 +530,35 @@ if __name__ == "__main__":
             rsol = rmdps[m].rsolve_mpi(b"robust_l1",np.asarray(thresholds[m]))
 
             if LI_METHODS[m] is Methods.INCR_REPLACE_V:
-                u_estimate, regret = incrementally_replace_V(rsol.valuefunction, num_samples,\
-                                                num_simulation, num_update, sa_confidence, orig_sol)
+                u_estimate, regret, violation = incrementally_replace_V(rsol.valuefunction,\
+                                num_samples,num_simulation, num_update, sa_confidence, orig_sol)
                 under_estimation[m].append(u_estimate)
                 real_regret[m].append(regret)
+                violations[m].append(violation)
             elif LI_METHODS[m] is Methods.INCR_ADD_V:
-                u_estimate, regret = incrementally_add_V(rsol.valuefunction, num_samples,\
-                                                num_simulation, num_update, sa_confidence, orig_sol)
+                u_estimate, regret, violation = incrementally_add_V(rsol.valuefunction, num_samples,\
+                                        num_simulation, num_update, sa_confidence, orig_sol)
                 under_estimation[m].append(u_estimate)
                 real_regret[m].append(regret)
+                violations[m].append(violation)
             else:
                 under_estimation[m].append( np.dot(initial,orig_sol.valuefunction) -\
                                                 np.dot(initial,rsol.valuefunction))
                 ropt_sol = est_true_mdp.solve_mpi(policy=rsol.policy)
                 real_regret[m].append( np.dot(initial,orig_sol.valuefunction) -\
                                                 np.dot(initial,ropt_sol.valuefunction))
+                violations[m].append( 1 if (np.dot(initial, ropt_sol.valuefunction) - \
+                                        np.dot(initial, rsol.valuefunction)) < 0 else 0 )
 
 ### Plot results
-print(calc_return)
+#print(calc_return)
 #generic_plot(sample_steps, calc_return, "Number of samples", "Total expected return \n (initial distribution x valuefunction)")
 
 generic_plot(sample_steps, under_estimation, "Number of samples", 'Calculated return error', legend_pos="upper right", figure_name="Generic_plot_Under_Estimation.pdf")
 
-generic_plot(sample_steps, real_regret, "Number of samples", 'Calculated return error', legend_pos="upper right", figure_name="Generic_plot_True_Regret.pdf")
+generic_plot(sample_steps, real_regret, "Number of samples", 'Calculated true regret', legend_pos="upper right", figure_name="Generic_plot_True_Regret.pdf")
+
+generic_plot(sample_steps, violations, "Number of samples", 'Violations', legend_pos="upper right", figure_name="Generic_plot_violations.pdf")
 
 
 

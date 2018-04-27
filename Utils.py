@@ -16,6 +16,7 @@ if __name__ == "__main__":
         EM = "Expectation Maximization"
         INCR_REPLACE_V = "Incrementally Replace Value Function"
         INCR_ADD_V = "Incrementally Add Value Function"
+        #For single state-action, KNOWNV is the same as INCR_ADD_V
         
         NUM_METHODS = 7 #Number of methods
     
