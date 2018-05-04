@@ -1,4 +1,4 @@
-import Bayesian_Uncertainty_Set
+import Dirichlet_Uncertainty_set
 import Gaussian_Uncertainty_Set
 from craam import crobust
 import Utils

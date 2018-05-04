@@ -45,6 +45,10 @@ def evaluate_bayesian_uncertainty(num_points, num_next_states, reward, confidenc
     bayes_ret = np.zeros(num_simulation)
     bayes_ret_err = np.zeros(num_simulation)
     
+    mean_th = np.zeros(num_simulation)
+    mean_ret = np.zeros(num_simulation)
+    mean_ret_err = np.zeros(num_simulation)
+    
     hoeff_th = np.zeros(num_simulation)
     hoeff_ret = np.zeros(num_simulation)
     hoeff_ret_err = np.zeros(num_simulation)
@@ -75,14 +79,17 @@ def evaluate_bayesian_uncertainty(num_points, num_next_states, reward, confidenc
         #print(i,"true_distribution",true_distribution)
         # get samples from multinomial distribution
         mult = np.random.multinomial(num_points, true_distribution)
-        #print("mult",mult)
+        
+        mean_transition_prob = mult / np.sum(mult)
+        #print("mult",mult,"mean_transition_prob",mean_transition_prob)
+        
         # ** calculate simple bayesian threshold
         # sample transition points from the posterior Dirichlet distribution        
         dir_points = np.random.dirichlet(mult + prior, bayes_samples) 
         
+        #print("true_distribution",true_distribution,"mult",mult)
         #print("dir_points",dir_points)
-        
-        #print(dir_points)
+
         # calc mean probability p_hat 
         # TODO: marek changed from: nominal_prob = np.mean(dir_points, axis=0)
         # TODO: that may not result in a valid probability distribution, take the mean of samples instead
@@ -114,12 +121,14 @@ def evaluate_bayesian_uncertainty(num_points, num_next_states, reward, confidenc
         true_ret_knownV = true_distribution @ value_function
         
         bayes_ret[i] = crobust.worstcase_l1(reward, nominal_prob_bayes, bayes_th[i])
+        mean_ret[i] = crobust.worstcase_l1(reward, mean_transition_prob, 0)
         hoeff_ret[i] = crobust.worstcase_l1(reward, nominal_prob_freq, hoeff_th[i])
         tight_hoeff_ret[i] = crobust.worstcase_l1(reward, nominal_prob_freq, tight_hoeff_th[i])
         em_ret[i] = crobust.worstcase_l1(reward, em_nominal, em_th[i])
         knownV_ret[i] = knownV[0]
         
         bayes_ret_err[i] = (true_ret - bayes_ret[i]) / true_ret
+        mean_ret_err[i] = (true_ret - mean_ret[i]) / true_ret
         hoeff_ret_err[i] = (true_ret - hoeff_ret[i]) /true_ret
         tight_hoeff_ret_err[i] = (true_ret - tight_hoeff_ret[i]) /true_ret
         em_ret_err[i] = (true_ret - em_ret[i]) /true_ret
@@ -130,6 +139,7 @@ def evaluate_bayesian_uncertainty(num_points, num_next_states, reward, confidenc
     #print("mean:",np.mean(bayes_ret_err < 0))
     # make sure to not count negative return errors to improve the mena
     return [(Methods.BAYES, np.mean(np.maximum(0,bayes_ret_err)), np.mean(bayes_th), np.mean(bayes_ret_err < 0), np.mean(bayes_ret), np.std(np.maximum(0,bayes_ret_err)), np.std(bayes_th) ),\
+            (Methods.CENTROID, np.mean(np.maximum(0,mean_ret_err)), 0, np.mean(mean_ret_err < 0), np.mean(mean_ret), np.std(np.maximum(0,mean_ret_err)), 0 ),\
             (Methods.HOEFF, np.mean(np.maximum(0,hoeff_ret_err)), np.mean(hoeff_th), np.mean(hoeff_ret_err < 0), np.mean(hoeff_ret), np.std(np.maximum(0,hoeff_ret_err)), np.std(hoeff_th) ),\
             (Methods.HOEFFTIGHT, np.mean(np.maximum(0,tight_hoeff_ret_err)), np.mean(tight_hoeff_th), np.mean(tight_hoeff_ret_err < 0), np.mean(tight_hoeff_ret), np.std(np.maximum(0,tight_hoeff_ret_err)), np.std(tight_hoeff_th)),\
             (Methods.EM, np.mean(np.maximum(0,em_ret_err)), np.mean(em_th), np.mean(em_ret_err < 0), np.mean(em_ret), np.std(np.maximum(0,em_ret_err)), np.std(em_th) ),\

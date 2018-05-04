@@ -1,4 +1,4 @@
-import Bayesian_Uncertainty_Set
+import Dirichlet_Uncertainty_set
 import Gaussian_Uncertainty_Set
 from craam import crobust
 import Utils
@@ -9,13 +9,13 @@ import tqdm
 ### Run Bayesian Experiments
 if __name__ == "__main__":
     # number of assumes states in the MDP
-    num_next_states = 5
+    num_next_states = 10
     # number of sampling steps
-    num_iterations = 5
+    num_iterations = 30
     # the desired confidence level
     confidence_level = 0.90
     # number of runs
-    runs = 5
+    runs = 30
     # step size in the number of samples
     sample_step = 5
     
@@ -42,44 +42,48 @@ with open('dumped_results/Bayes_result_'+str(num_next_states)+"_"+str(num_iterat
 
 ### Plot Bayesian Results
 if __name__ == "__main__":
-    plot_returns(bayes_results, sample_steps, [Methods.BAYES, Methods.HOEFF, Methods.HOEFFTIGHT], "Bayes_return_BHHT.pdf",runs)
+    compare_methods = [Methods.BAYES, Methods.CENTROID, Methods.HOEFF, Methods.HOEFFTIGHT,  Methods.INCR_ADD_V]
+    plot_returns(bayes_results, sample_steps, compare_methods, "Dirichlet_return_single_state.pdf",runs)
     #plot_returns(bayes_results, sample_steps, [Methods.BAYES, Methods.EM, Methods.KNOWNV], "Bayes_return_BEK.pdf",runs)
-    plot_thresholds(bayes_results, sample_steps, [Methods.BAYES, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.EM, Methods.INCR_ADD_V], "Bayes_threshold_comparison.pdf",runs)
-    plot_violations(bayes_results, sample_steps, [Methods.BAYES, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.EM, Methods.INCR_ADD_V], "Bayes_violations_comparison.pdf")
+    plot_thresholds(bayes_results, sample_steps, compare_methods, "Dirichlet_threshold_single_state.pdf",runs)
+    plot_violations(bayes_results, sample_steps, compare_methods, "Dirichlet_violations_single_state.pdf")
 
 
 ### Run Gaussian Experiments
 if __name__ == "__main__":
+    # number of assumes states in the MDP
+    num_next_states = 10
     # number of sampling steps
-    num_iterations = 5
+    num_iterations = 30
     # the desired confidence level
     confidence_level = 0.90
     # number of runs
-    runs = 5
+    runs = 30
     min_demand, max_demand = 0, 100
     demand_mean_prior_mean, demand_mean_prior_std, true_demand_std = 50, 15, 25
 
-    sample_step = 2
+    sample_step = 5
 
     gauss_results = []
-    value_function = np.random.uniform(low=0, high=10, size=(max_demand-min_demand+1))
+    value_function = np.arange(max_demand-min_demand+1)
+    #np.random.uniform(low=0, high=10, size=(max_demand-min_demand+1))
     print("value_function",value_function)
     
     sample_steps = np.arange(sample_step,sample_step*num_iterations+1, step = sample_step)
-    
+
     #for pos, i in enumerate(tqdm.tqdm(sample_steps)):
         #gauss_results.append(evaluate_gaussian_uncertainty(i, confidence_level, runs, value_function, value_function, [value_function], min_demand, max_demand))
         
     for pos, i in enumerate(tqdm.tqdm(sample_steps)):
         gauss_results.append(evaluate_gaussian_uncertainty(i, confidence_level, runs, value_function, min_demand, max_demand))
  
-    
+
 ### Plot Gaussian Results
 if __name__ == "__main__":
-    compare_methods = [Methods.BAYES, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.INCR_REPLACE_V, Methods.INCR_ADD_V]
+    compare_methods = [Methods.BAYES, Methods.CENTROID, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.INCR_ADD_V]
     plot_returns(gauss_results, sample_steps, compare_methods, "gaussian_return_single_state.pdf", runs)
-    #plot_thresholds(gauss_results, sample_steps, [Methods.HOEFF, Methods.HOEFFTIGHT],"gaussian_threhold_hoeff_vs_tight.pdf", runs)
-    #plot_violations(gauss_results, sample_steps, [Methods.HOEFF, Methods.HOEFFTIGHT, Methods.KNOWNV],"gaussian_violations_hoeff_vs_tight.pdf")
+    plot_thresholds(gauss_results, sample_steps, compare_methods,"gaussian_threshold_single_state.pdf", runs)
+    plot_violations(gauss_results, sample_steps, compare_methods ,"gaussian_violation_single_state.pdf")
 
 
 ### Invasive Species Simulation

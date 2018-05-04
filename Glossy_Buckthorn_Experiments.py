@@ -1,4 +1,4 @@
-import Bayesian_Uncertainty_Set
+import Dirichlet_Uncertainty_set
 import Gaussian_Uncertainty_Set
 from craam import crobust
 import Utils
@@ -287,7 +287,7 @@ def incrementally_replace_V(valuefunction, num_samples, num_simulation,\
             transitions_points = list_transitions_points[s] #get_Bayesian_transition_kernel(s, num_samples)
             for a in range(num_actions):
                 dir_points = np.asarray(transitions_points[a])
-                res = construct_uset_known_value_function(dir_points, valuefunction, confidence)
+                res = construct_uset_known_value_function(dir_points, valuefunction, sa_confidence)
                 
                 threshold[0].append(s)
                 threshold[1].append(a)
@@ -374,7 +374,7 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
 
                 #for valuefunction in valuefunctions:
                 res = construct_uset_known_value_function(dir_points, valuefunctions[-1],\
-                                                            confidence)
+                                                            sa_confidence)
                 
                 if (s,a) not in nomianl_points:
                     nomianl_points[(s,a)] = []
@@ -439,8 +439,7 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
                                                 np.dot(initial,ret.valuefunction)
                                                 
             violation = 1 if (np.dot(initial, ret.valuefunction) - np.dot(initial,\
-                            rsol.valuefunction))<0 else 0
-                                                
+                            rsol.valuefunction))<0 else 0                        
             break
 
         valuefunction = rsol.valuefunction

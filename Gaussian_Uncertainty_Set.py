@@ -35,6 +35,10 @@ def evaluate_gaussian_uncertainty(num_samples, confidence_level, num_simulation,
     bayes_ret = np.zeros(num_simulation)
     bayes_ret_err = np.zeros(num_simulation)
     
+    mean_th = np.zeros(num_simulation)
+    mean_ret = np.zeros(num_simulation)
+    mean_ret_err = np.zeros(num_simulation)
+    
     hoeff_th = np.zeros(num_simulation)
     hoeff_ret = np.zeros(num_simulation)
     hoeff_ret_err = np.zeros(num_simulation)
@@ -63,6 +67,8 @@ def evaluate_gaussian_uncertainty(num_samples, confidence_level, num_simulation,
 
         # get samples from multinomial distribution, 3 next states with uniform transition kernel
         mult = np.random.multinomial(num_samples, true_distribution)
+        
+        mean_transition_prob = mult / np.sum(mult)
         
         # sample from the posterior over samples
         # *** this is the main point of difference ***
@@ -104,12 +110,14 @@ def evaluate_gaussian_uncertainty(num_samples, confidence_level, num_simulation,
         
         true_ret = true_distribution @ reward
         bayes_ret[i] = crobust.worstcase_l1(reward, nominal_prob_bayes, bayes_th[i])
+        mean_ret[i] = crobust.worstcase_l1(reward, mean_transition_prob, 0)
         hoeff_ret[i] = crobust.worstcase_l1(reward, nominal_prob_freq, hoeff_th[i])
         tight_hoeff_ret[i] = crobust.worstcase_l1(reward, nominal_prob_freq, tight_hoeff_th[i])
         em_ret[i] = crobust.worstcase_l1(reward, em_nominal, em_th[i])
         knownV_ret[i] = knownV[0]
         
         bayes_ret_err[i] = (true_ret - bayes_ret[i]) / true_ret
+        mean_ret_err[i] = (true_ret - mean_ret[i]) / true_ret
         hoeff_ret_err[i] = (true_ret - hoeff_ret[i]) /true_ret
         tight_hoeff_ret_err[i] = (true_ret - tight_hoeff_ret[i]) /true_ret
         em_ret_err[i] = (true_ret - em_ret[i]) /true_ret
@@ -117,6 +125,7 @@ def evaluate_gaussian_uncertainty(num_samples, confidence_level, num_simulation,
         
     # make sure to not count negative return errors to improve the mena
     return [(Methods.BAYES, np.mean(np.maximum(0,bayes_ret_err)), np.mean(bayes_th), np.mean(bayes_ret_err < 0), np.mean(bayes_ret), np.std(np.maximum(0,bayes_ret_err)), np.std(bayes_th) ),\
+            (Methods.CENTROID, np.mean(np.maximum(0,mean_ret_err)), 0, np.mean(mean_ret_err < 0), np.mean(mean_ret), np.std(np.maximum(0,mean_ret_err)), 0 ),\
             (Methods.HOEFF, np.mean(np.maximum(0,hoeff_ret_err)), np.mean(hoeff_th), np.mean(hoeff_ret_err < 0), np.mean(hoeff_ret), np.std(np.maximum(0,hoeff_ret_err)), np.std(hoeff_th) ),\
             (Methods.HOEFFTIGHT, np.mean(np.maximum(0,tight_hoeff_ret_err)), np.mean(tight_hoeff_th), np.mean(tight_hoeff_ret_err < 0), np.mean(tight_hoeff_ret), np.std(np.maximum(0,tight_hoeff_ret_err)), np.std(tight_hoeff_th)),\
             (Methods.EM, np.mean(np.maximum(0,em_ret_err)), np.mean(em_th), np.mean(em_ret_err < 0), np.mean(em_ret), np.std(np.maximum(0,em_ret_err)), np.std(em_th) ),\

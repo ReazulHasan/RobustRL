@@ -23,6 +23,23 @@ if __name__ == "__main__":
     LI_METHODS = [Methods.BAYES, Methods.CENTROID, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.EM,\
                     Methods.INCR_REPLACE_V, Methods.INCR_ADD_V]
 
+###Dirichlet Threshold
+def compute_bayesian_threshold(points, nominal_point, confidence_level):
+    """
+    Computes an empirical thresholds from samples from a posterior distriL1 threshold'bution
+    Must adjust the confidence level when the MDP has more states 
+    and actions using the union bound
+    """
+    assert(abs(np.sum(nominal_point) - 1) < 0.001)
+    for p in points:
+        assert(abs(np.sum(p) - 1) < 0.001)
+    
+    distances = [np.linalg.norm(p - nominal_point, ord = 1) for p in points]
+    confidence_rank = math.floor(len(points) * confidence_level)
+    dist = np.partition(distances, confidence_rank)[confidence_rank]
+    
+    return dist
+
 ###Process Gaussian distribution
 def discretize_gaussian(min_value, max_value, mean, std):
     """ 
