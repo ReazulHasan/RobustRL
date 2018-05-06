@@ -14,7 +14,7 @@ mean_growth_rate, std_growth_rate, std_observation = 1.1, 0.4, 2
 beta_1, beta_2, n_hat = 0.001, -0.0000021, int(carrying_capacity*2/3)
 threshold_control, prob_control, seed = 0, 0.5, 5
 discount_factor, eps = 0.9, 0.00001
-num_samples, num_actions = 20, 2
+num_samples, num_actions = 30, 2
 population = np.arange(min_population, carrying_capacity + 1, dtype=np.double)
 initial = np.ones(carrying_capacity-min_population+1)/(carrying_capacity-min_population+1)
 
@@ -188,7 +188,8 @@ def evaluate_uncertainty_set(current_population, num_samples, num_simulation, va
             dir_points = np.asarray(transitions_points[a])
             prior_dir_points = np.asarray(prior_transition_points[a]) + eps
             
-            #print("prior_dir_points",np.sum(prior_dir_points,axis=1))
+            if a==0:
+                print(a,"prior_dir_points",prior_dir_points)
             #print("dir_points.shape",dir_points[0].shape, dir_points[0])
             
             nominal_prob_bayes = np.mean(dir_points, axis=0)
@@ -454,9 +455,9 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
 ### run experiments
 if __name__ == "__main__":
     # number of sampling steps
-    num_iterations = 5
+    num_iterations = 2
     # number of runs
-    num_simulation = 5
+    num_simulation = 2
     sample_step = 2
     confidence_level = 0.9
     

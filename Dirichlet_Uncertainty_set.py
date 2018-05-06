@@ -66,7 +66,7 @@ def evaluate_bayesian_uncertainty(num_points, num_next_states, reward, confidenc
     knownV_ret_err = np.zeros(num_simulation)
     
     # number of samples of the true distribution to take when estimating the Bayes samples
-    bayes_samples = 25
+    bayes_samples = 200
     prior = np.ones(num_next_states)
     
     #value_function = np.random.randint(10, size=num_next_states)
@@ -127,16 +127,16 @@ def evaluate_bayesian_uncertainty(num_points, num_next_states, reward, confidenc
         em_ret[i] = crobust.worstcase_l1(reward, em_nominal, em_th[i])
         knownV_ret[i] = knownV[0]
         
-        bayes_ret_err[i] = (true_ret - bayes_ret[i]) / true_ret
-        mean_ret_err[i] = (true_ret - mean_ret[i]) / true_ret
-        hoeff_ret_err[i] = (true_ret - hoeff_ret[i]) /true_ret
-        tight_hoeff_ret_err[i] = (true_ret - tight_hoeff_ret[i]) /true_ret
-        em_ret_err[i] = (true_ret - em_ret[i]) /true_ret
-        knownV_ret_err[i] = (true_ret_knownV - knownV_ret[i])/true_ret_knownV
+        bayes_ret_err[i] = (true_ret - bayes_ret[i]) #/ true_ret
+        mean_ret_err[i] = (true_ret - mean_ret[i]) #/ true_ret
+        hoeff_ret_err[i] = (true_ret - hoeff_ret[i]) #/true_ret
+        tight_hoeff_ret_err[i] = (true_ret - tight_hoeff_ret[i]) #/true_ret
+        em_ret_err[i] = (true_ret - em_ret[i]) #/true_ret
+        knownV_ret_err[i] = (true_ret_knownV - knownV_ret[i]) #/true_ret_knownV
         
-    #bayes_ret_err[0] = -1
-    #print(bayes_ret_err, "bayes_ret_err < 0: ",bayes_ret_err < 0)
-    #print("mean:",np.mean(bayes_ret_err < 0))
+        #print("true_ret_knownV", true_ret_knownV, "knownV_ret[i]", knownV_ret[i], "knownV_ret_err[i]", knownV_ret_err[i])
+    #print("knownV_ret_err<0", knownV_ret_err<0, "np.mean(knownV_ret_err<0)", np.mean(knownV_ret_err<0))
+
     # make sure to not count negative return errors to improve the mena
     return [(Methods.BAYES, np.mean(np.maximum(0,bayes_ret_err)), np.mean(bayes_th), np.mean(bayes_ret_err < 0), np.mean(bayes_ret), np.std(np.maximum(0,bayes_ret_err)), np.std(bayes_th) ),\
             (Methods.CENTROID, np.mean(np.maximum(0,mean_ret_err)), 0, np.mean(mean_ret_err < 0), np.mean(mean_ret), np.std(np.maximum(0,mean_ret_err)), 0 ),\

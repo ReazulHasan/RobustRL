@@ -160,7 +160,7 @@ def evaluate_gaussian_knownV(num_samples, confidence_level, num_simulation, valu
     reward = np.arange(min_demand, max_demand + 2, dtype=np.double)
     
     # number of samples of the true distribution to take when estimatng the Bayes samples
-    bayes_samples = 25
+    bayes_samples = 200
     
     knownV_th = np.zeros(num_simulation)
     knownV_ret = np.zeros(num_simulation)

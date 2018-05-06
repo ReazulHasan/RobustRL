@@ -9,15 +9,15 @@ import tqdm
 ### Run Bayesian Experiments
 if __name__ == "__main__":
     # number of assumes states in the MDP
-    num_next_states = 10
+    num_next_states = 5
     # number of sampling steps
-    num_iterations = 30
+    num_iterations = 50 #30
     # the desired confidence level
-    confidence_level = 0.90
+    confidence_level = 0.95
     # number of runs
-    runs = 30
+    runs = 200 #30
     # step size in the number of samples
-    sample_step = 5
+    sample_step = 10
     
     value_function = np.random.randint(10, size=num_next_states)
     #define reward for the simple mdp with 1 state, 1 action, num_next_states number of next states with uniform transition probability
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     sample_steps = np.arange(sample_step,sample_step*num_iterations+1, step = sample_step)
     
     for pos, i in enumerate(tqdm.tqdm(sample_steps)):
-        bayes_results.append(evaluate_bayesian_uncertainty(i, num_next_states, reward, confidence_level, runs, value_function))
+        bayes_results.append(evaluate_bayesian_uncertainty(i, num_next_states, reward, confidence_level, runs, reward))
 
 ###Save results
 import pickle
@@ -44,25 +44,22 @@ with open('dumped_results/Bayes_result_'+str(num_next_states)+"_"+str(num_iterat
 if __name__ == "__main__":
     compare_methods = [Methods.BAYES, Methods.CENTROID, Methods.HOEFF, Methods.HOEFFTIGHT,  Methods.INCR_ADD_V]
     plot_returns(bayes_results, sample_steps, compare_methods, "Dirichlet_return_single_state.pdf",runs)
-    #plot_returns(bayes_results, sample_steps, [Methods.BAYES, Methods.EM, Methods.KNOWNV], "Bayes_return_BEK.pdf",runs)
     plot_thresholds(bayes_results, sample_steps, compare_methods, "Dirichlet_threshold_single_state.pdf",runs)
     plot_violations(bayes_results, sample_steps, compare_methods, "Dirichlet_violations_single_state.pdf")
 
 
 ### Run Gaussian Experiments
 if __name__ == "__main__":
-    # number of assumes states in the MDP
-    num_next_states = 10
     # number of sampling steps
-    num_iterations = 30
+    num_iterations = 50
     # the desired confidence level
-    confidence_level = 0.90
+    confidence_level = 0.95
     # number of runs
-    runs = 30
-    min_demand, max_demand = 0, 100
-    demand_mean_prior_mean, demand_mean_prior_std, true_demand_std = 50, 15, 25
+    runs = 200
+    min_demand, max_demand = 0, 150
+    demand_mean_prior_mean, demand_mean_prior_std, true_demand_std = 80, 15, 13
 
-    sample_step = 5
+    sample_step = 10
 
     gauss_results = []
     value_function = np.arange(max_demand-min_demand+1)
