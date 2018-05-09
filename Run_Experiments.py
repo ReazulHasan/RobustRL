@@ -11,7 +11,7 @@ if __name__ == "__main__":
     # number of assumes states in the MDP
     num_next_states = 5
     # number of sampling steps
-    num_iterations = 50 #30
+    num_iterations = 20 #30
     # the desired confidence level
     confidence_level = 0.95
     # number of runs
@@ -29,7 +29,6 @@ if __name__ == "__main__":
     for pos, i in enumerate(tqdm.tqdm(sample_steps)):
         bayes_results.append(evaluate_bayesian_uncertainty(i, num_next_states, reward, confidence_level, runs, reward))
 
-###Save results
 import pickle
 
 with open('dumped_results/Bayes_result_'+str(num_next_states)+"_"+str(num_iterations)\
@@ -51,7 +50,7 @@ if __name__ == "__main__":
 ### Run Gaussian Experiments
 if __name__ == "__main__":
     # number of sampling steps
-    num_iterations = 50
+    num_iterations = 20
     # the desired confidence level
     confidence_level = 0.95
     # number of runs
@@ -73,7 +72,13 @@ if __name__ == "__main__":
         
     for pos, i in enumerate(tqdm.tqdm(sample_steps)):
         gauss_results.append(evaluate_gaussian_uncertainty(i, confidence_level, runs, value_function, min_demand, max_demand))
- 
+
+import pickle
+
+with open('dumped_results/gauss_results'+str(num_next_states)+"_"+str(num_iterations)\
+        +"_"+str(confidence_level)+"_"+str(runs)+"_"+str(sample_step),'wb') as fp:
+    
+    pickle.dump(bayes_results, fp)
 
 ### Plot Gaussian Results
 if __name__ == "__main__":

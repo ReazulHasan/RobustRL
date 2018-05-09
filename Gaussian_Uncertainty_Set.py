@@ -124,13 +124,13 @@ def evaluate_gaussian_uncertainty(num_samples, confidence_level, num_simulation,
         knownV_ret_err[i] = (true_ret - knownV_ret[i])/true_ret
         
     # make sure to not count negative return errors to improve the mena
-    return [(Methods.BAYES, np.mean(np.maximum(0,bayes_ret_err)), np.mean(bayes_th), np.mean(bayes_ret_err < 0), np.mean(bayes_ret), np.std(np.maximum(0,bayes_ret_err)), np.std(bayes_th) ),\
-            (Methods.CENTROID, np.mean(np.maximum(0,mean_ret_err)), 0, np.mean(mean_ret_err < 0), np.mean(mean_ret), np.std(np.maximum(0,mean_ret_err)), 0 ),\
-            (Methods.HOEFF, np.mean(np.maximum(0,hoeff_ret_err)), np.mean(hoeff_th), np.mean(hoeff_ret_err < 0), np.mean(hoeff_ret), np.std(np.maximum(0,hoeff_ret_err)), np.std(hoeff_th) ),\
-            (Methods.HOEFFTIGHT, np.mean(np.maximum(0,tight_hoeff_ret_err)), np.mean(tight_hoeff_th), np.mean(tight_hoeff_ret_err < 0), np.mean(tight_hoeff_ret), np.std(np.maximum(0,tight_hoeff_ret_err)), np.std(tight_hoeff_th)),\
-            (Methods.EM, np.mean(np.maximum(0,em_ret_err)), np.mean(em_th), np.mean(em_ret_err < 0), np.mean(em_ret), np.std(np.maximum(0,em_ret_err)), np.std(em_th) ),\
-            (Methods.INCR_REPLACE_V, np.mean(np.maximum(0,knownV_ret_err)), np.mean(knownV_th), np.mean(knownV_ret_err<0), np.mean(knownV_ret), np.std(np.maximum(0,knownV_ret_err)), np.std(knownV_th)),
-            (Methods.INCR_ADD_V, np.mean(np.maximum(0,knownV_ret_err)), np.mean(knownV_th), np.mean(knownV_ret_err<0), np.mean(knownV_ret), np.std(np.maximum(0,knownV_ret_err)), np.std(knownV_th))]
+    return [(Methods.BAYES, np.mean(abs(bayes_ret_err)), np.mean(bayes_th), np.mean(bayes_ret_err < 0), np.mean(bayes_ret), np.std(abs(bayes_ret_err)), np.std(bayes_th) ),\
+            (Methods.CENTROID, np.mean(abs(mean_ret_err)), 0, np.mean(mean_ret_err < 0), np.mean(mean_ret), np.std(abs(mean_ret_err)), 0 ),\
+            (Methods.HOEFF, np.mean(abs(hoeff_ret_err)), np.mean(hoeff_th), np.mean(hoeff_ret_err < 0), np.mean(hoeff_ret), np.std(abs(hoeff_ret_err)), np.std(hoeff_th) ),\
+            (Methods.HOEFFTIGHT, np.mean(abs(tight_hoeff_ret_err)), np.mean(tight_hoeff_th), np.mean(tight_hoeff_ret_err < 0), np.mean(tight_hoeff_ret), np.std(abs(tight_hoeff_ret_err)), np.std(tight_hoeff_th)),\
+            (Methods.EM, np.mean(abs(em_ret_err)), np.mean(em_th), np.mean(em_ret_err < 0), np.mean(em_ret), np.std(abs(em_ret_err)), np.std(em_th) ),\
+            (Methods.INCR_REPLACE_V, np.mean(abs(knownV_ret_err)), np.mean(knownV_th), np.mean(knownV_ret_err<0), np.mean(knownV_ret), np.std(abs(knownV_ret_err)), np.std(knownV_th)),
+            (Methods.INCR_ADD_V, np.mean(abs(knownV_ret_err)), np.mean(knownV_th), np.mean(knownV_ret_err<0), np.mean(knownV_ret), np.std(abs(knownV_ret_err)), np.std(knownV_th))]
             
             
 
@@ -198,7 +198,7 @@ def evaluate_gaussian_knownV(num_samples, confidence_level, num_simulation, valu
         knownV_ret_err[i] = (true_ret - knownV_ret[i])/true_ret
         
     # make sure to not count negative return errors to improve the mean
-    return [(Methods.KNOWNV, np.mean(np.maximum(0,knownV_ret_err)), np.mean(knownV_th), np.mean(knownV_ret_err<0), np.mean(knownV_ret), np.std(np.maximum(0,knownV_ret_err)), np.std(knownV_th), np.mean(KnownV_nomianl_point,axis=0))]
+    return [(Methods.KNOWNV, np.mean(abs(knownV_ret_err)), np.mean(knownV_th), np.mean(knownV_ret_err<0), np.mean(knownV_ret), np.std(abs(knownV_ret_err)), np.std(knownV_th), np.mean(KnownV_nomianl_point,axis=0))]
 
 
 

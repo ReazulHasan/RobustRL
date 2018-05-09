@@ -68,7 +68,7 @@ def get_Bayesian_transition_kernel(current_population, num_samples):
     
     @return transition_points Transition points for all the actions
     """
-    bayes_samples = 300
+    bayes_samples = 200
     prior_transition_points = {}
     transitions_points = {}#[[] for _ in range(num_actions)]
     if current_population==0:
@@ -104,8 +104,8 @@ def get_Bayesian_transition_kernel(current_population, num_samples):
         true_distribution = discretize_gaussian(min_population, carrying_capacity,\
                                         true_population_mean, true_population_std)
         
-        prior_points = np.array([discretize_gaussian(min_population, carrying_capacity,\
-                    true_population_mean, true_population_std) for k in range(bayes_samples)])
+        #prior_points = np.array([discretize_gaussian(min_population, carrying_capacity,\
+        #            true_population_mean, true_population_std) for k in range(bayes_samples)])
         
         samples_from_prior = np.random.multinomial(num_samples, true_distribution)
         
@@ -118,6 +118,8 @@ def get_Bayesian_transition_kernel(current_population, num_samples):
         posterior_points = np.array([discretize_gaussian(min_population, carrying_capacity,\
                     np.random.normal(estmean_population_mean, estmean_population_std),\
                     true_population_std) for k in range(bayes_samples)])
+        
+        #print("np.sum(samples_from_prior)",np.sum(samples_from_prior), "num_samples",num_samples)
         
         prior_transition_points[action] = samples_from_prior/num_samples
         transitions_points[action] = posterior_points
@@ -188,8 +190,8 @@ def evaluate_uncertainty_set(current_population, num_samples, num_simulation, va
             dir_points = np.asarray(transitions_points[a])
             prior_dir_points = np.asarray(prior_transition_points[a]) + eps
             
-            if a==0:
-                print(a,"prior_dir_points",prior_dir_points)
+            #if a==0:
+                #print(a,"prior_dir_points",prior_dir_points)
             #print("dir_points.shape",dir_points[0].shape, dir_points[0])
             
             nominal_prob_bayes = np.mean(dir_points, axis=0)
@@ -305,11 +307,11 @@ def incrementally_replace_V(valuefunction, num_samples, num_simulation,\
         violation = 0
         #rret = rmdp.solve_mpi(policy=rpolicy)
         ret = est_true_mdp.solve_mpi(policy=rpolicy)
-        cur_regret = np.dot(initial,ret.valuefunction) - np.dot(initial,rsol.valuefunction)
+        cur_regret = abs(np.dot(initial,ret.valuefunction) - np.dot(initial,rsol.valuefunction))
         if cur_regret>under_estimate:
             #ropt_sol = est_true_mdp.solve_mpi(policy=rpolicy)
-            real_regret = np.dot(initial,orig_sol.valuefunction) -\
-                                                np.dot(initial,ret.valuefunction)
+            real_regret = abs(np.dot(initial,orig_sol.valuefunction) -\
+                                                np.dot(initial,ret.valuefunction))
             violation = 1 if (np.dot(initial, ret.valuefunction) - np.dot(initial,\
                             rsol.valuefunction))<0 else 0
             break
@@ -358,7 +360,7 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
     #Store the latest nominal of nominal point & threshold
     nominal_threshold = {}
     under_estimate, real_regret = 0.0, 0.0
-    
+    print("incrementally_add_V() called")
     for i in range(num_update):
         #print("valuefunctions",i,": ",valuefunctions)
         #keep track whether the current iteration keeps the mdp unchanged
@@ -419,8 +421,10 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
                 for next_st in population:
                     reward = calc_reward(next_st, trp[int(next_st)], a)
                     rmdp.add_transition(s, a, next_st, trp[int(next_st)], reward)
-
+        
+        print(i, "before rmdp.rsolve_mpi()")
         rsol = rmdp.rsolve_mpi(b"robust_l1",threshold)
+        print(i, "after rmdp.rsolve_mpi()")
         
         violation = 0
 
@@ -433,11 +437,11 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
 
             rpolicy = rsol.policy
             ret = est_true_mdp.solve_mpi(policy=rpolicy)
-            under_estimate = np.dot(initial,ret.valuefunction) - np.dot(initial,rsol.valuefunction)
+            under_estimate = abs(np.dot(initial,ret.valuefunction) - np.dot(initial,rsol.valuefunction))
             
             #ropt_sol = rmdp.solve_mpi(policy=orig_sol.policy)
-            real_regret = np.dot(initial,orig_sol.valuefunction) -\
-                                                np.dot(initial,ret.valuefunction)
+            real_regret = abs(np.dot(initial,orig_sol.valuefunction) -\
+                                                np.dot(initial,ret.valuefunction))
                                                 
             violation = 1 if (np.dot(initial, ret.valuefunction) - np.dot(initial,\
                             rsol.valuefunction))<0 else 0                        
@@ -455,11 +459,12 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
 ### run experiments
 if __name__ == "__main__":
     # number of sampling steps
-    num_iterations = 2
+    num_iterations = 8
     # number of runs
-    num_simulation = 2
-    sample_step = 2
-    confidence_level = 0.9
+    num_simulation = 8
+    runs = 8
+    sample_step = 5
+    confidence_level = 0.95
     
     #max number of iterations to improve value functions
     num_update = 10
@@ -497,59 +502,71 @@ if __name__ == "__main__":
     
     #sol = est_true_mdp.solve_mpi()
     
-    for pos, num_samples in enumerate(tqdm.tqdm(sample_steps)):        
-        rmdps = []
-        for m in range(Methods.NUM_METHODS.value):
-            rmdps.append(crobust.MDP(0, discount_factor))
+    for pos, num_samples in enumerate(tqdm.tqdm(sample_steps)):
         
-        for s in population:          
-            params = evaluate_uncertainty_set(s, num_samples, num_simulation, arbitrary_valuefunction, sa_confidence)
+        cur_under_estimation = np.zeros( (Methods.NUM_METHODS.value,runs) )
+        cur_real_regret = np.zeros( (Methods.NUM_METHODS.value,runs) )
+        cur_violations = np.zeros( (Methods.NUM_METHODS.value,runs) )
+        
+        for i in range(runs):
+            rmdps = []
+            for m in range(Methods.NUM_METHODS.value):
+                rmdps.append(crobust.MDP(0, discount_factor))
+            
+            for s in population:          
+                params = evaluate_uncertainty_set(s, num_samples, num_simulation, arbitrary_valuefunction, sa_confidence)
+                
+                for m in range(Methods.NUM_METHODS.value):
+                    if LI_METHODS[m] is Methods.EM:
+                        continue
+                    trp = params[m][3]
+                    threshold = params[m][1]
+                    
+                    #if s==5 and m==0:
+                        #print("transition probability",trp,"threshold",threshold)
+                    
+                    for a in range(num_actions):
+                        for next_st in population:
+                            reward = calc_reward(next_st, trp[a][int(next_st)], a)
+                            rmdps[m].add_transition(s, a, next_st, trp[a][int(next_st)], reward)
+                        thresholds[m][0].append(s)
+                        thresholds[m][1].append(a)
+                        thresholds[m][2].append(threshold[a])
             
             for m in range(Methods.NUM_METHODS.value):
                 if LI_METHODS[m] is Methods.EM:
                     continue
-                trp = params[m][3]
-                threshold = params[m][1]
+                #if LI_METHODS[m] == Methods.BAYES:
+                    #print(Methods.BAYES.value," ", rmdps[m].to_json(), "thresholds: ", thresholds[m])
+                print("---------- i",i,"m",m,"------------")
+                rsol = rmdps[m].rsolve_mpi(b"robust_l1",np.asarray(thresholds[m]))
+                print("rsol.valuefunction",rsol.valuefunction)
                 
-                #if s==5 and m==0:
-                    #print("transition probability",trp,"threshold",threshold)
-                
-                for a in range(num_actions):
-                    for next_st in population:
-                        reward = calc_reward(next_st, trp[a][int(next_st)], a)
-                        rmdps[m].add_transition(s, a, next_st, trp[a][int(next_st)], reward)
-                    thresholds[m][0].append(s)
-                    thresholds[m][1].append(a)
-                    thresholds[m][2].append(threshold[a])
-
+                if LI_METHODS[m] is Methods.INCR_REPLACE_V:
+                    u_estimate, regret, violation = incrementally_replace_V(rsol.valuefunction,\
+                                    num_samples,num_simulation, num_update, sa_confidence, orig_sol)
+                    cur_under_estimation[m,i] = u_estimate
+                    cur_real_regret[m,i] = regret
+                    cur_violations[m,i] = violation
+                elif LI_METHODS[m] is Methods.INCR_ADD_V:
+                    u_estimate, regret, violation = incrementally_add_V(rsol.valuefunction, num_samples,\
+                                            num_simulation, num_update, sa_confidence, orig_sol)
+                    cur_under_estimation[m,i] = u_estimate
+                    cur_real_regret[m,i] = regret
+                    cur_violations[m,i] = violation
+                else:
+                    cur_under_estimation[m,i] = abs(np.dot(initial,orig_sol.valuefunction) -\
+                                                    np.dot(initial,rsol.valuefunction))
+                    ropt_sol = est_true_mdp.solve_mpi(policy=rsol.policy)
+                    cur_real_regret[m,i] = abs(np.dot(initial,orig_sol.valuefunction) -\
+                                                    np.dot(initial,ropt_sol.valuefunction))
+                    cur_violations[m,i] = 1 if (np.dot(initial, ropt_sol.valuefunction) - \
+                                            np.dot(initial, rsol.valuefunction)) < 0 else 0
         for m in range(Methods.NUM_METHODS.value):
-            if LI_METHODS[m] is Methods.EM:
-                continue
-            #if LI_METHODS[m] == Methods.BAYES:
-                #print(Methods.BAYES.value," ", rmdps[m].to_json(), "thresholds: ", thresholds[m])
-            rsol = rmdps[m].rsolve_mpi(b"robust_l1",np.asarray(thresholds[m]))
-
-            if LI_METHODS[m] is Methods.INCR_REPLACE_V:
-                u_estimate, regret, violation = incrementally_replace_V(rsol.valuefunction,\
-                                num_samples,num_simulation, num_update, sa_confidence, orig_sol)
-                under_estimation[m].append(u_estimate)
-                real_regret[m].append(regret)
-                violations[m].append(violation)
-            elif LI_METHODS[m] is Methods.INCR_ADD_V:
-                u_estimate, regret, violation = incrementally_add_V(rsol.valuefunction, num_samples,\
-                                        num_simulation, num_update, sa_confidence, orig_sol)
-                under_estimation[m].append(u_estimate)
-                real_regret[m].append(regret)
-                violations[m].append(violation)
-            else:
-                under_estimation[m].append( np.dot(initial,orig_sol.valuefunction) -\
-                                                np.dot(initial,rsol.valuefunction))
-                ropt_sol = est_true_mdp.solve_mpi(policy=rsol.policy)
-                real_regret[m].append( np.dot(initial,orig_sol.valuefunction) -\
-                                                np.dot(initial,ropt_sol.valuefunction))
-                violations[m].append( 1 if (np.dot(initial, ropt_sol.valuefunction) - \
-                                        np.dot(initial, rsol.valuefunction)) < 0 else 0 )
-
+            under_estimation[m].append( np.mean(cur_under_estimation[m]) )
+            real_regret[m].append( np.mean(cur_real_regret[m]) )
+            violations[m].append( np.mean(cur_violations[m]) )
+        
 ### Plot results
 #print(calc_return)
 #generic_plot(sample_steps, calc_return, "Number of samples", "Total expected return \n (initial distribution x valuefunction)")
