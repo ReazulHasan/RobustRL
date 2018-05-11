@@ -56,7 +56,7 @@ def evaluate_gaussian_uncertainty(num_samples, confidence_level, num_simulation,
     knownV_ret_err = np.zeros(num_simulation)
     
     # number of samples of the true distribution to take when estimatng the Bayes samples
-    bayes_samples = 25
+    bayes_samples = 300
 
     for i in range(num_simulation):
         # construct the true distribution
@@ -132,7 +132,6 @@ def evaluate_gaussian_uncertainty(num_samples, confidence_level, num_simulation,
             (Methods.INCR_REPLACE_V, np.mean(abs(knownV_ret_err)), np.mean(knownV_th), np.mean(knownV_ret_err<0), np.mean(knownV_ret), np.std(abs(knownV_ret_err)), np.std(knownV_th)),
             (Methods.INCR_ADD_V, np.mean(abs(knownV_ret_err)), np.mean(knownV_th), np.mean(knownV_ret_err<0), np.mean(knownV_ret), np.std(abs(knownV_ret_err)), np.std(knownV_th))]
             
-            
 
 ### construct & evaluate uncertainty with Gaussian Distribution & Known Value Function
 def evaluate_gaussian_knownV(num_samples, confidence_level, num_simulation, value_function, min_demand = 0, max_demand = 100, demand_mean_prior_mean = 50, demand_mean_prior_std = 15, true_demand_std = 25):
@@ -160,7 +159,7 @@ def evaluate_gaussian_knownV(num_samples, confidence_level, num_simulation, valu
     reward = np.arange(min_demand, max_demand + 2, dtype=np.double)
     
     # number of samples of the true distribution to take when estimatng the Bayes samples
-    bayes_samples = 200
+    bayes_samples = 300
     
     knownV_th = np.zeros(num_simulation)
     knownV_ret = np.zeros(num_simulation)

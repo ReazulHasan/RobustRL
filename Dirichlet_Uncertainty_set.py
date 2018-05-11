@@ -66,7 +66,7 @@ def evaluate_bayesian_uncertainty(num_points, num_next_states, reward, confidenc
     knownV_ret_err = np.zeros(num_simulation)
     
     # number of samples of the true distribution to take when estimating the Bayes samples
-    bayes_samples = 200
+    bayes_samples = 300
     prior = np.ones(num_next_states)
     
     #value_function = np.random.randint(10, size=num_next_states)

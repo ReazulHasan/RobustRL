@@ -23,15 +23,18 @@ fig_height, fig_width = 14, 8
 def plot_returns(results_dir, sample_steps, compare_methods, figure_name="Return_compare.pdf",runs=1):
     method_names = [r[0] for r in results_dir[0]]
     plt.figure(num=1, figsize=(fig_height, fig_width), dpi=80, facecolor='w', edgecolor='k')
-    
+    print("plot_returns() is called", compare_methods, method_names)
     for method_index, method_name in enumerate(method_names):
-        if method_name not in compare_methods:
+        print("method_label 0",method_name.value)
+        if method_name.value not in compare_methods:
             continue
+        method_label = "Robustify with Sensible Value Functions (RSVF)" if method_name.value == Methods.INCR_ADD_V.value else method_name.value
+        print("method_label",method_label)
         mean = np.array([r[method_index][1] for r in results_dir])
         #print("np.sqrt(sample_steps)",np.sqrt(sample_steps))
         sigma = np.array([r[method_index][5] for r in results_dir]) / np.sqrt(sample_steps)
         #print(mean, sigma, mean + 1.96 * sigma)
-        plt.plot(sample_steps, mean, linestyle=lineStyles[method_index%num_styles], marker=markers[method_index%num_markers], alpha=0.7, label = method_name.value, color=LI_COLORS[method_index%num_colors])
+        plt.plot(sample_steps, mean, linestyle=lineStyles[method_index%num_styles], marker=markers[method_index%num_markers], alpha=0.7, label = method_label, color=LI_COLORS[method_index%num_colors])
         plt.fill_between(sample_steps, mean - STD_95 * sigma, mean + STD_95 * sigma, alpha=0.2, color=LI_COLORS[method_index%num_colors])
 
     plt.xlabel('Number of samples'+r'$(N)$')
@@ -49,11 +52,12 @@ def plot_thresholds(results_dir, sample_steps, compare_methods, figure_name="Thr
     plt.figure(num=1, figsize=(fig_height, fig_width), dpi=80, facecolor='w', edgecolor='k')
     
     for method_index, method_name in enumerate(method_names):
-        if method_name not in compare_methods:
+        if method_name.value not in compare_methods:
             continue
+        method_label = "Robustify with Sensible Value Functions (RSVF)" if method_name.value == Methods.INCR_ADD_V.value else method_name.value
         mean = np.array([r[method_index][2] for r in results_dir])
         sigma = np.array([r[method_index][6] for r in results_dir]) / np.sqrt(len(sample_steps))
-        plt.plot(sample_steps, [r[method_index][2] for r in results_dir], linestyle=lineStyles[method_index%num_styles], marker=markers[method_index%num_markers], alpha=0.7, label = method_name.value, color=LI_COLORS[method_index%num_colors])
+        plt.plot(sample_steps, [r[method_index][2] for r in results_dir], linestyle=lineStyles[method_index%num_styles], marker=markers[method_index%num_markers], alpha=0.7, label = method_label, color=LI_COLORS[method_index%num_colors])
         plt.fill_between(sample_steps, mean - STD_95 * sigma, mean + STD_95 * sigma, alpha=0.5, color=LI_COLORS[method_index%num_colors])
     
     plt.xlabel('Number of samples'+r'$(N)$')
@@ -72,9 +76,10 @@ def plot_violations(results_dir, sample_steps, compare_methods, figure_name="Vio
     plt.figure(num=1, figsize=(fig_height, fig_width), dpi=80, facecolor='w', edgecolor='k')
     #plt.subplot(121)
     for method_index, method_name in enumerate(method_names):
-        if method_name not in compare_methods:
+        if method_name.value not in compare_methods:
             continue
-        plt.plot(sample_steps, [r[method_index][3] for r in results_dir], linestyle=lineStyles[method_index%num_styles], marker=markers[method_index%num_markers], alpha=0.7, label = method_name.value, color=LI_COLORS[method_index%num_colors])
+        method_label = "Robustify with Sensible Value Functions (RSVF)" if method_name.value == Methods.INCR_ADD_V.value else method_name.value
+        plt.plot(sample_steps, [r[method_index][3] for r in results_dir], linestyle=lineStyles[method_index%num_styles], marker=markers[method_index%num_markers], alpha=0.7, label = method_label, color=LI_COLORS[method_index%num_colors])
     plt.xlabel('Number of samples')
     plt.ylabel('Fraction violated')
     #plt.title('L1 threshold values')
