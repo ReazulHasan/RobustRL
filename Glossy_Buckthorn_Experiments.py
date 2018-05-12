@@ -244,7 +244,7 @@ def evaluate_uncertainty_set(current_population, num_samples, num_simulation, va
                 np.mean(incrementallyReplaceV_nominalPoints,axis=1)),\
             (Methods.INCR_ADD_V, np.mean(incrementallyAddV_th, axis=1),\
                 np.std(incrementallyAddV_th,axis=1),\
-                np.mean(incrementallyAddV_nomianlPoints,axis=1))], true_transition_points
+                np.mean(incrementallyAddV_nomianlPoints,axis=1))], true_transition_points, transitions_points
 
 #print(evaluate_uncertainty_set(5, 5, 5, arbitrary_valuefunction, 0.9))
 
@@ -459,11 +459,11 @@ def incrementally_add_V(valuefunctions, num_samples, num_simulation,\
 ### run experiments
 if __name__ == "__main__":
     # number of sampling steps
-    num_iterations = 2
+    num_iterations = 5
     # number of runs
-    num_simulation = 2
-    runs = 2
-    sample_step = 2
+    num_simulation = 5
+    runs = 5
+    sample_step = 5
     confidence_level = 0.95
     compare_methods = [Methods.BAYES, Methods.CENTROID, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.INCR_ADD_V]
     #max number of iterations to improve value functions
@@ -472,24 +472,6 @@ if __name__ == "__main__":
     #(1-overall_confidence) is the total violation allowed. This total violation is distributed among all the state action pairs
     # according to the Union bound.
     sa_confidence = 1 - ( (1 - confidence_level) / (num_actions * (carrying_capacity-min_population+1)) )
-
-    #Construct the estimated true MDP by taking a lot of samples.
-    seed = np.random.randint(runs)
-    est_true_mdp = crobust.MDP(0, discount_factor)
-    for s in population:
-        transitions_points = get_Bootstrapped_transition_kernel(s, horizon, 1, s)
-        for a in range(num_actions):
-            trp = transitions_points[a][0]
-            
-            for next_st in population:
-                reward = calc_reward(next_st, trp[int(next_st)], a)
-                est_true_mdp.add_transition(s, a, next_st, trp[int(next_st)], reward)
-    
-    orig_sol = est_true_mdp.solve_mpi()
-    orig_policy = orig_sol.policy
-    
-    random_policy = np.random.randint(2, size=(carrying_capacity-min_population+1))
-    arbitrary_valuefunction = est_true_mdp.solve_vi(policy=random_policy).valuefunction
                 
     sample_steps = np.arange(sample_step,sample_step*num_iterations+1, step = sample_step)
     
@@ -504,24 +486,45 @@ if __name__ == "__main__":
     
     for pos, num_samples in enumerate(tqdm.tqdm(sample_steps)):
         
+        #Construct the estimated true MDP by taking a lot of samples.
+        seed = np.random.randint(runs)
+        est_true_mdp = crobust.MDP(0, discount_factor)
+        for s in population:
+            transitions_points = get_Bootstrapped_transition_kernel(s, horizon, 1, s)
+            for a in range(num_actions):
+                trp = transitions_points[a][0]
+                
+                for next_st in population:
+                    reward = calc_reward(next_st, trp[int(next_st)], a)
+                    est_true_mdp.add_transition(s, a, next_st, trp[int(next_st)], reward)
+        
+        orig_sol = est_true_mdp.solve_mpi()
+        orig_policy = orig_sol.policy
+        
+        random_policy = np.random.randint(2, size=(carrying_capacity-min_population+1))
+        arbitrary_valuefunction = orig_sol.valuefunction
+        #est_true_mdp.solve_vi(policy=random_policy).valuefunction
+        
         cur_under_estimation = np.zeros( (Methods.NUM_METHODS.value,runs) )
         cur_real_regret = np.zeros( (Methods.NUM_METHODS.value,runs) )
         cur_violations = np.zeros( (Methods.NUM_METHODS.value,runs) )
         
         for i in range(runs):
-            est_true_mdp = crobust.MDP(0, discount_factor)
+            cur_est_true_mdp = crobust.MDP(0, discount_factor)
             rmdps = []
             for m in range(Methods.NUM_METHODS.value):
                 rmdps.append(crobust.MDP(0, discount_factor))
             
+            post_transition_points = {}
+            
             for s in population:          
-                params, true_transition_points = evaluate_uncertainty_set(s, num_samples, num_simulation, arbitrary_valuefunction, sa_confidence)
+                params, true_transition_points, post_transition_points[s] = evaluate_uncertainty_set(s, num_samples, num_simulation, arbitrary_valuefunction, sa_confidence)
                 
                 for a in range(num_actions):
                     for next_st in population:
                         reward = calc_reward(next_st, true_transition_points[a][int(next_st)], a)
-                        est_true_mdp.add_transition(s, a, next_st, true_transition_points[a][int(next_st)], reward)
-                            
+                        cur_est_true_mdp.add_transition(s, a, next_st, true_transition_points[a][int(next_st)], reward)
+                
                 for m in range(Methods.NUM_METHODS.value):
                     if LI_METHODS[m] is Methods.EM:
                         continue
@@ -535,12 +538,6 @@ if __name__ == "__main__":
                         thresholds[m][0].append(s)
                         thresholds[m][1].append(a)
                         thresholds[m][2].append(threshold[a])
-            
-            orig_sol = est_true_mdp.solve_mpi()
-            orig_policy = orig_sol.policy
-            
-            random_policy = np.random.randint(2, size=(carrying_capacity-min_population+1))
-            arbitrary_valuefunction = est_true_mdp.solve_vi(policy=random_policy).valuefunction
             
             for m in range(Methods.NUM_METHODS.value):
                 if LI_METHODS[m] not in compare_methods:
@@ -573,6 +570,23 @@ if __name__ == "__main__":
                                                     np.dot(initial,ropt_sol.valuefunction))
                     cur_violations[m,i] = 1 if (np.dot(initial, ropt_sol.valuefunction) - \
                                             np.dot(initial, rsol.valuefunction)) < 0 else 0
+                    """
+                    cur_under_estimation[m,i] = abs(np.dot(initial,orig_sol.valuefunction) -\
+                                                    np.dot(initial,rsol.valuefunction))
+                    cur_real_regret[m,i] = abs(np.dot(initial,orig_sol.valuefunction) -\
+                                                    np.dot(initial,ropt_sol.valuefunction))
+                    cur_violations[m,i] = 1 if (np.dot(initial, ropt_sol.valuefunction) - \
+                                            np.dot(initial, rsol.valuefunction)) < 0 else 0
+                    """
+                                            
+            est_true_mdp = cur_est_true_mdp
+            orig_sol = est_true_mdp.solve_mpi()
+            orig_policy = orig_sol.policy
+            
+            random_policy = np.random.randint(2, size=(carrying_capacity-min_population+1))
+            arbitrary_valuefunction = orig_sol.valuefunction
+            #est_true_mdp.solve_vi(policy=random_policy).valuefunction
+            
         for m in range(Methods.NUM_METHODS.value):
             under_estimation[m].append( np.mean(cur_under_estimation[m]) )
             real_regret[m].append( np.mean(cur_real_regret[m]) )
