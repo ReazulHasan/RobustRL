@@ -2,13 +2,15 @@ import Dirichlet_Uncertainty_set
 import Gaussian_Uncertainty_Set
 from craam import crobust
 import Utils
+from Utils import *
 import Plot
 import numpy as np
 import tqdm
 import time
+import sys
 
 horizon, num_runs = 100, 500
-min_population, carrying_capacity = 0, 30
+min_population, carrying_capacity = 0, 6
 initial_population = int(carrying_capacity/3) #np.random.randint(min_population, carrying_capacity)
 mean_growth_rate, std_growth_rate, std_observation = 1.5, 0.8, 5
 beta_1, beta_2, n_hat = 0.3, -0.21, int(carrying_capacity*2/3)
@@ -108,7 +110,7 @@ def get_Bayesian_transition_kernel(current_population, num_samples):
         #Samples from the true distribution defining the nominal points for Mean, Hoeff & Hoeff Tight
         samples_from_prior = np.random.multinomial(num_samples, true_distribution)
         
-        #Compute the mosterior mean & std from the samples & prior
+        #Compute the posterior mean & std from the samples & prior
         estmean_population_mean, estmean_population_std = normal_aposteriori(population, samples_from_prior,\
                             true_population_std, growth_rate_mean_prior_mean, growth_rate_mean_prior_std)
         
@@ -123,17 +125,16 @@ def get_Bayesian_transition_kernel(current_population, num_samples):
 
     return posterior_transitions_points, prior_transition_points, true_transition_points
 
-def calc_reward(next_state, trp_to_next_state, action):
+def calc_reward(curr_state, action):
     """
     Compute the reward for the next state & action.
     
-    @next_state The next state in the transition
-    @trp_to_next_state Transition probability for the next state
+    @curr_state The next state in the transition
     @action The action taken
     
     @return reward Computed reward
     """
-    return next_state*trp_to_next_state*(-1) + action * (-2)
+    return curr_state*(-1) + action * (-2)
 
 ###
 def evaluate_uncertainty_set(current_population, num_samples, num_simulation, confidence_level):
@@ -214,20 +215,22 @@ def evaluate_uncertainty_set(current_population, num_samples, num_simulation, co
             em_nominalPoints[a].append(em_nominal)
             """
     return [(Methods.BAYES, np.mean(bayes_th, axis=1), np.std(bayes_th, axis=1),\
-                np.mean(bayes_nominalPoints, axis=1) ),\
-            (Methods.CENTROID, [0 for _ in range(num_actions)], [0 for _ in range(num_actions)],\
-                np.mean(hoeff_nominalPoints, axis=1) ),\
-            (Methods.HOEFF, np.mean(hoeff_th, axis=1), np.std(hoeff_th, axis=1),\
-                np.mean(hoeff_nominalPoints, axis=1) ),\
-            (Methods.HOEFFTIGHT, np.mean(tight_hoeff_th, axis=1),\
-                np.std(tight_hoeff_th, axis=1),\
-                np.mean(hoeff_nominalPoints, axis=1)),\
-            (Methods.EM, np.mean(em_th, axis=1), np.std(em_th, axis=1),\
-                np.mean(em_nominalPoints, axis=1) )], np.mean(true_transition_nominalPoints, axis=1), post_transition_nominalPoints
+                    np.mean(bayes_nominalPoints, axis=1) ),\
+                (Methods.CENTROID, [0 for _ in range(num_actions)], [0 for _ in range(num_actions)],\
+                    np.mean(hoeff_nominalPoints, axis=1) ),\
+                (Methods.HOEFF, np.mean(hoeff_th, axis=1), np.std(hoeff_th, axis=1),\
+                    np.mean(hoeff_nominalPoints, axis=1) ),\
+                (Methods.HOEFFTIGHT, np.mean(tight_hoeff_th, axis=1),\
+                    np.std(tight_hoeff_th, axis=1),\
+                    np.mean(hoeff_nominalPoints, axis=1)),\
+                (Methods.EM, np.mean(em_th, axis=1), np.std(em_th, axis=1),\
+                    np.mean(em_nominalPoints, axis=1) )],\
+            np.mean(true_transition_nominalPoints, axis=1),\
+            post_transition_nominalPoints
 
 ###
 def RSVF(valuefunctions, posterior_transition_points, num_samples, num_update, \
-                                                                        sa_confidence, orig_sol):
+            sa_confidence, orig_sol):
     """
     Method to incrementally improve value function by adding the new value function with 
     previous valuefunctions, finding the nominal point & threshold for this cluster of value functions
@@ -321,7 +324,8 @@ def RSVF(valuefunctions, posterior_transition_points, num_samples, num_update, \
                     
                     #Add the current transition to the RMDP
                     for next_st in population:
-                        reward = calc_reward(next_st, trp[int(next_st)], a)
+                        #reward = calc_reward(next_st, trp[int(next_st)], a)
+                        reward = calc_reward(s, a)
                         rmdp.add_transition(s, a, next_st, trp[int(next_st)], reward)
             
             #Solve the current RMDP
@@ -356,19 +360,21 @@ def RSVF(valuefunctions, posterior_transition_points, num_samples, num_update, \
             X.append(i)
             Y.append(valuefunction[0])
             i+=1
-        except:
+        except Exception as e:
             print("!!! Unexpected Error in RSVF !!!", sys.exc_info()[0])
+            print(e)
             continue
         
     return under_estimate, real_regret, violation
 
 ### run experiments
+
 if __name__ == "__main__":
     # number of sampling steps
-    num_iterations = 10
-    num_simulation = 10
-    runs = 10
-    sample_step = 10
+    num_iterations = 3
+    num_simulation = 1 # TODO: must be always one, incorrect with a greater value
+    runs = 4
+    sample_step = 2
     confidence_level = 0.90
     compare_methods = [Methods.BAYES, Methods.CENTROID, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.INCR_ADD_V]
     #max number of iterations to improve value functions
@@ -391,7 +397,8 @@ if __name__ == "__main__":
     #for pos, num_samples in enumerate(tqdm.tqdm(sample_steps)):
     
     num_samples = sample_step
-
+    pbar = tqdm.tqdm(total = (sample_step*num_iterations+1) )
+    
     while num_samples <= (sample_step*num_iterations+1):
 
         try:
@@ -410,13 +417,14 @@ if __name__ == "__main__":
                 for s in population:
                     #Get the nominal points & thresholds for each state & all actions of Bayes, Mean, Hoeff,
                     #HoeffTight RMDPs. Get the true transition points & the posterior transition points for RSVF
-                    params, true_transition_points, posterior_transition_points[s] = evaluate_uncertainty_set(s,\
-                                                num_samples, num_simulation, sa_confidence)
+                    params, true_transition_points, posterior_transition_points[s] = \
+                        evaluate_uncertainty_set(s, num_samples, num_simulation, sa_confidence)
                     
                     #Construct the true MDP with true transition points
                     for a in range(num_actions):
                         for next_st in population:
-                            reward = calc_reward(next_st, true_transition_points[a][int(next_st)], a)
+                            #reward = calc_reward(next_st, true_transition_points[a][int(next_st)], a)
+                            reward = calc_reward(s, a)
                             est_true_mdp.add_transition(s, a, next_st, true_transition_points[a][int(next_st)], reward)
                     
                     #Build RMDPs for Bayes, Mean, Hoeff, HoeffTight
@@ -428,7 +436,8 @@ if __name__ == "__main__":
                         
                         for a in range(num_actions):
                             for next_st in population:
-                                reward = calc_reward(next_st, trp[a][int(next_st)], a)
+                                #reward = calc_reward(next_st, trp[a][int(next_st)], a)
+                                reward = calc_reward(s, a)
                                 rmdps[m].add_transition(s, a, next_st, trp[a][int(next_st)], reward)
                             thresholds[m][0].append(s)
                             thresholds[m][1].append(a)
@@ -464,10 +473,13 @@ if __name__ == "__main__":
                 real_regret[m].append( np.mean(cur_real_regret[m]) )
                 violations[m].append( np.mean(cur_violations[m]) )
             num_samples += sample_step
-        except:
+            pbar.update(sample_step)
+        except Exception as e:
             print("!!! Unexpected Error in main experiment loop !!!", sys.exc_info()[0])
+            print(e)
             continue
-
+    pbar.close()
+    
 ###Save results
 import pickle
 with open('dumped_results/GlossyBuckthorn_result_num_iterations_'+str(num_iterations)+"_num_simulation_"+str(num_simulation)+"_runs_"+str(runs)+"_sample_step_"+str(sample_step)+"_confidence_level_"+str(confidence_level),'wb') as fp:
@@ -475,9 +487,9 @@ with open('dumped_results/GlossyBuckthorn_result_num_iterations_'+str(num_iterat
 
 ### Plot results
 #print(calc_return)
-#generic_plot(sample_steps, calc_return, "Number of samples", "Total expected return \n (initial distribution x valuefunction)")
+#generic_plot(sample_steps, calc_return, "Number of samples", "Total expected return n (initial distribution x valuefunction)")
 
-generic_plot(sample_steps, under_estimation, "Number of samples", 'Calculated return error', legend_pos="upper right", figure_name="Generic_plot_Under_Estimation.pdf")
+generic_plot(sample_steps, under_estimation, "Number of samples", 'Calculated return error', legend_pos="lower right", figure_name="Generic_plot_Under_Estimation.pdf")
 
 generic_plot(sample_steps, real_regret, "Number of samples", 'Calculated true regret', legend_pos="upper right", figure_name="Generic_plot_True_Regret.pdf")
 
@@ -497,7 +509,8 @@ generic_plot(sample_steps, violations, "Number of samples", 'Violations', legend
             trp = transitions_points[a][0]
             
             for next_st in population:
-                reward = calc_reward(next_st, trp[int(next_st)], a)
+                #reward = calc_reward(next_st, trp[int(next_st)], a)
+                reward = calc_reward(s, a)
                 est_true_mdp.add_transition(s, a, next_st, trp[int(next_st)], reward)
     
     orig_sol = est_true_mdp.solve_mpi()
@@ -550,7 +563,8 @@ def incrementally_replace_V(valuefunction, num_samples, num_simulation,\
                 trp = res[2]
                 
                 for next_st in population:
-                    reward = calc_reward(next_st, trp[int(next_st)], a)
+                    #reward = calc_reward(next_st, trp[int(next_st)], a)
+                    reward = calc_reward(s, a)
                     rmdp.add_transition(s, a, next_st, trp[int(next_st)], reward)
         
         rsol = rmdp.rsolve_mpi(b"robust_l1",threshold)

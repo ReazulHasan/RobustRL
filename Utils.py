@@ -7,21 +7,21 @@ from enum import Enum
 from scipy import stats
 
 ### Enumerate experimenting methods
-if __name__ == "__main__":
-    class Methods(Enum):
-        BAYES = "Bayes Simple"
-        CENTROID = "Mean Transition Probability"
-        HOEFF = "Hoeffding"
-        HOEFFTIGHT = "Hoeffding Tight"
-        EM = "Expectation Maximization"
-        INCR_REPLACE_V = "Incrementally Replace Value Function"
-        INCR_ADD_V = "Incrementally Add Value Function"
-        #For single state-action, KNOWNV is the same as INCR_ADD_V
-        
-        NUM_METHODS = 7 #Number of methods
+
+class Methods(Enum):
+    BAYES = "Bayes Simple"
+    CENTROID = "Mean Transition Probability"
+    HOEFF = "Hoeffding"
+    HOEFFTIGHT = "Hoeffding Tight"
+    EM = "Expectation Maximization"
+    INCR_REPLACE_V = "Incrementally Replace Value Function"
+    INCR_ADD_V = "Incrementally Add Value Function"
+    #For single state-action, KNOWNV is the same as INCR_ADD_V
     
-    LI_METHODS = [Methods.BAYES, Methods.CENTROID, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.EM,\
-                    Methods.INCR_REPLACE_V, Methods.INCR_ADD_V]
+    NUM_METHODS = 7 #Number of methods
+
+LI_METHODS = [Methods.BAYES, Methods.CENTROID, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.EM,\
+                Methods.INCR_REPLACE_V, Methods.INCR_ADD_V]
 
 ###Dirichlet Threshold
 def compute_bayesian_threshold(points, nominal_point, confidence_level):
