@@ -35,7 +35,7 @@ def compute_bayesian_threshold(points, nominal_point, confidence_level):
         assert(abs(np.sum(p) - 1) < 0.001)
     
     distances = [np.linalg.norm(p - nominal_point, ord = 1) for p in points]
-    confidence_rank = math.floor(len(points) * confidence_level)
+    confidence_rank = math.ceil(len(points) * confidence_level)
     dist = np.partition(distances, confidence_rank)[confidence_rank]
     
     return dist
