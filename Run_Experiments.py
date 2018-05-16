@@ -45,6 +45,23 @@ if __name__ == "__main__":
     plot_thresholds(bayes_results, sample_steps, compare_methods, "Dirichlet_threshold_single_state.pdf",runs)
     plot_violations(bayes_results, sample_steps, compare_methods, "Dirichlet_violations_single_state.pdf")
 
+###Load & Plot
+if __name__ == "__main__":
+    import pickle
+    
+    f = open('dumped_results/Bayes_result_state_5_iteration_10_conf_0.95_runs_200_step_10', 'rb')   # 'r' for reading; can be omitted
+    bayes_results, sample_steps = pickle.load(f)         # load file content as mydict
+    f.close()                
+    
+    num_iterations = 10
+    sample_step = 10
+    sample_steps = np.arange(sample_step,sample_step*num_iterations+1, step = sample_step)
+    
+    compare_methods = [Methods.BAYES.value, Methods.CENTROID.value, Methods.HOEFF.value, Methods.HOEFFTIGHT.value,  Methods.INCR_ADD_V.value]
+    plot_returns(bayes_results, sample_steps, compare_methods, "Dirichlet_return_single_state.pdf",runs)
+    plot_thresholds(bayes_results, sample_steps, compare_methods, "Dirichlet_threshold_single_state.pdf",runs)
+    plot_violations(bayes_results, sample_steps, compare_methods, "Dirichlet_violations_single_state.pdf")
+
 
 ### Run Gaussian Experiments
 if __name__ == "__main__":
@@ -86,7 +103,7 @@ if __name__ == "__main__":
 
 ###Load & Plot
 if __name__ == "__main__":
-    import pickle              # import module first
+    import pickle
     
     f = open('dumped_results/gauss_results_20_0.95_200_10_05.09.18', 'rb')   # 'r' for reading; can be omitted
     gauss_results = pickle.load(f)         # load file content as mydict

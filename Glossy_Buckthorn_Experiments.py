@@ -10,7 +10,7 @@ import time
 import sys
 
 horizon, num_runs = 100, 500
-min_population, carrying_capacity = 0, 6
+min_population, carrying_capacity = 0, 15
 initial_population = int(carrying_capacity/3) #np.random.randint(min_population, carrying_capacity)
 mean_growth_rate, std_growth_rate, std_observation = 1.5, 0.8, 5
 beta_1, beta_2, n_hat = 0.3, -0.21, int(carrying_capacity*2/3)
@@ -69,7 +69,7 @@ def get_Bayesian_transition_kernel(current_population, num_samples):
     
     @return transition_points Transition points for all the actions
     """
-    bayes_samples = 500
+    bayes_samples = 700
     prior_transition_points = {}
     posterior_transitions_points = {}
     true_transition_points = {}
@@ -371,10 +371,10 @@ def RSVF(valuefunctions, posterior_transition_points, num_samples, num_update, \
 
 if __name__ == "__main__":
     # number of sampling steps
-    num_iterations = 3
+    num_iterations = 10
     num_simulation = 1 # TODO: must be always one, incorrect with a greater value
-    runs = 4
-    sample_step = 2
+    runs = 100
+    sample_step = 10
     confidence_level = 0.90
     compare_methods = [Methods.BAYES, Methods.CENTROID, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.INCR_ADD_V]
     #max number of iterations to improve value functions
@@ -393,27 +393,24 @@ if __name__ == "__main__":
     real_regret = [[] for _ in range(Methods.NUM_METHODS.value)] #optimal regret
     violations = [[] for _ in range(Methods.NUM_METHODS.value)]
     
+    #num_samples = sample_step
+    #pbar = tqdm.tqdm(total = (sample_step*num_iterations+1) )
     
-    #for pos, num_samples in enumerate(tqdm.tqdm(sample_steps)):
-    
-    num_samples = sample_step
-    pbar = tqdm.tqdm(total = (sample_step*num_iterations+1) )
-    
-    while num_samples <= (sample_step*num_iterations+1):
-
-        try:
-            cur_under_estimation = np.zeros( (Methods.NUM_METHODS.value,runs) )
-            cur_real_regret = np.zeros( (Methods.NUM_METHODS.value,runs) )
-            cur_violations = np.zeros( (Methods.NUM_METHODS.value,runs) )
-            
-            for i in range(runs):
+    #while num_samples <= (sample_step*num_iterations+1):
+    for pos, num_samples in enumerate(tqdm.tqdm(sample_steps)):
+        cur_under_estimation = np.zeros( (Methods.NUM_METHODS.value,runs) )
+        cur_real_regret = np.zeros( (Methods.NUM_METHODS.value,runs) )
+        cur_violations = np.zeros( (Methods.NUM_METHODS.value,runs) )
+        i=0
+        while i<runs:
+            try:
                 est_true_mdp = crobust.MDP(0, discount_factor)
                 rmdps = []
                 for m in range(Methods.NUM_METHODS.value):
                     rmdps.append(crobust.MDP(0, discount_factor))
                 
                 posterior_transition_points = {}
-
+    
                 for s in population:
                     #Get the nominal points & thresholds for each state & all actions of Bayes, Mean, Hoeff,
                     #HoeffTight RMDPs. Get the true transition points & the posterior transition points for RSVF
@@ -467,18 +464,18 @@ if __name__ == "__main__":
                                                         np.dot(initial,ropt_sol.valuefunction))
                         cur_violations[m,i] = 1 if (np.dot(initial, ropt_sol.valuefunction) - \
                                                 np.dot(initial, rsol.valuefunction)) < 0 else 0
-                
-            for m in range(Methods.NUM_METHODS.value):
-                under_estimation[m].append( np.mean(cur_under_estimation[m]) )
-                real_regret[m].append( np.mean(cur_real_regret[m]) )
-                violations[m].append( np.mean(cur_violations[m]) )
-            num_samples += sample_step
-            pbar.update(sample_step)
-        except Exception as e:
-            print("!!! Unexpected Error in main experiment loop !!!", sys.exc_info()[0])
-            print(e)
-            continue
-    pbar.close()
+                i+=1
+            except Exception as e:
+                print("!!! Unexpected Error in main experiment loop !!! num_samples",num_samples, "i", i)
+                print(e)
+                continue
+        for m in range(Methods.NUM_METHODS.value):
+            under_estimation[m].append( (np.mean(cur_under_estimation[m]), np.std(cur_under_estimation[m])) )
+            real_regret[m].append( (np.mean(cur_real_regret[m]), np.std(cur_real_regret[m])) )
+            violations[m].append( (np.mean(cur_violations[m]), np.std(cur_violations[m])) )
+        #num_samples += sample_step
+        #pbar.update(sample_step)
+    #pbar.close()
     
 ###Save results
 import pickle
@@ -489,11 +486,11 @@ with open('dumped_results/GlossyBuckthorn_result_num_iterations_'+str(num_iterat
 #print(calc_return)
 #generic_plot(sample_steps, calc_return, "Number of samples", "Total expected return n (initial distribution x valuefunction)")
 
-generic_plot(sample_steps, under_estimation, "Number of samples", 'Calculated return error', legend_pos="lower right", figure_name="Generic_plot_Under_Estimation.pdf")
+plot_MDP_returns(sample_steps, under_estimation, figure_name="Glossy_Buckthorn_Under_Estimation.pdf")
 
-generic_plot(sample_steps, real_regret, "Number of samples", 'Calculated true regret', legend_pos="upper right", figure_name="Generic_plot_True_Regret.pdf")
+plot_MDP_returns(sample_steps, real_regret, figure_name="Glossy_Buckthorn_True_Regret.pdf")
 
-generic_plot(sample_steps, violations, "Number of samples", 'Violations', legend_pos="upper right", figure_name="Generic_plot_violations.pdf")
+plot_MDP_violations(sample_steps, violations, figure_name="Glossy_Buckthorn_violations.pdf")
 
 
 
