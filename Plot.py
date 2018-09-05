@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from Utils import *
 import math
 plt.rcParams['pdf.fonttype'] = 42
 plt.rcParams['ps.fonttype'] = 42
@@ -7,7 +8,7 @@ font = {'weight' : 'normal',
 
 plt.rc('font', **font)
 
-LI_COLORS = ['black','c','y','g','b','violet','r']
+LI_COLORS = ['g','c','black','y','b','violet','r']
 lineStyles = ['--', '-.', ':']
 markers = ['8', '^', '>', 's', 'p', 'v', 'D','<', 'x']
 #markers = ['s','<', '^', '>', 'v', '.']
@@ -23,13 +24,17 @@ fig_height, fig_width = 14, 8
 def plot_returns(results_dir, sample_steps, compare_methods, figure_name="Return_compare.pdf",runs=1):
     indices = {}
     methods = [r[0] for r in results_dir[0]]
+    #print("Methods---",methods)
     for method_index, method_name in enumerate(methods):
+        #print(method_index, method_name)
         indices[method_name] = method_index
-        
+    #print(indices)
+    #print(Methods.CENTROID.value in indices)
     method_names = [Methods.CENTROID, Methods.HOEFF, Methods.HOEFFTIGHT, Methods.BAYES, Methods.INCR_ADD_V]
     plt.figure(num=1, figsize=(fig_height, fig_width), dpi=80, facecolor='w', edgecolor='k')
     
     for method_index, method_name in enumerate(method_names):
+        print(method_index, method_name)
         method_index = indices[method_name]
         if method_name.value not in compare_methods:
             continue
@@ -46,12 +51,14 @@ def plot_returns(results_dir, sample_steps, compare_methods, figure_name="Return
         mean = np.array([r[method_index][1] for r in results_dir])
 
         sigma = np.array([r[method_index][5] for r in results_dir]) / np.sqrt(sample_steps)
-
+        
+        print("mean",mean, "sigma", sigma)
+        
         plt.plot(sample_steps, mean, linestyle=lineStyles[method_index%num_styles], marker=markers[method_index%num_markers], alpha=0.7, label = method_label, color=LI_COLORS[method_index%num_colors])
         plt.fill_between(sample_steps, mean - STD_95 * sigma, mean + STD_95 * sigma, alpha=0.2, color=LI_COLORS[method_index%num_colors])
 
     plt.xlabel('Number of samples')
-    plt.ylabel('Calculated return error: '+r'$|\rho^* - \rho(\xi)|$')
+    plt.ylabel('Calculated return error: '+r'$\mathbb{E}[\xi]$')
     #plt.title('Expected error in return with 95% confidence interval')
     plt.legend(loc='best', fancybox=True, framealpha=0.3)
     plt.yscale('log') #, nonposy='clip'
@@ -164,7 +171,7 @@ def plot_MDP_returns(X, Data, figure_name="Generic_Plot.pdf"):
         plt.fill_between(X, Y - STD_95 * sigma, Y + STD_95 * sigma, alpha=0.2, color=LI_COLORS[method_index%num_colors])
         
     plt.xlabel('Number of samples')
-    plt.ylabel('Calculated return error: '+r'$|\rho^* - \rho(\xi)|$')
+    plt.ylabel('Calculated return error: '+r'$\mathbb{E}[\xi]$')
     #plt.title(plot_title)
     #plt.legend(loc=legend_pos)
     plt.legend(loc='best', fancybox=True, framealpha=0.5)

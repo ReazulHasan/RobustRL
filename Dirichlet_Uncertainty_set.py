@@ -86,23 +86,17 @@ def evaluate_bayesian_uncertainty(num_points, num_next_states, reward, confidenc
         # ** calculate simple bayesian threshold
         # sample transition points from the posterior Dirichlet distribution        
         dir_points = np.random.dirichlet(mult + prior, bayes_samples) 
-        
-        #print("true_distribution",true_distribution,"mult",mult)
-        #print("dir_points",dir_points)
 
         # calc mean probability p_hat 
-        # TODO: marek changed from: nominal_prob = np.mean(dir_points, axis=0)
-        # TODO: that may not result in a valid probability distribution, take the mean of samples instead
+
         nominal_prob_bayes = np.mean(dir_points, axis=0)
         nominal_prob_bayes /= np.sum(nominal_prob_bayes)
-        # TODO: marek: also tried but does not seem to work
+
         nominal_prob_freq = mult / np.sum(mult)
         
-        # TODO: marek: delta is 1 - confidence
         # get uncertainty set & threshold
         bayes_th[i] = compute_bayesian_threshold(dir_points, nominal_prob_bayes, confidence_level)        
         
-        # TODO: marek: delta is 1 - confidence
         # ** calculate threshold from hoeffding bound equation
         hoeff_th[i] = np.sqrt((2 / num_points )*np.log((2**num_next_states-2)/ (1-confidence_level) ))   
         

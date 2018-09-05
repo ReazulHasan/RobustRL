@@ -237,6 +237,7 @@ def construct_uset_known_value_function(transition_points, value_function, confi
     points.sort(key=lambda x: x[1])
 
     conf_rank = math.ceil(len(transition_points)*confidence)
+    #print("confidence_rank", conf_rank, "len(trans_points)", len(transition_points), "confidence",confidence,"product",confidence*len(transition_points))
     robust_ret = points[-conf_rank][1]
     robust_th = 0 #np.linalg.norm(points[-int(conf_rank)][0]-points[-int(conf_rank/2)][0], ord=1)
     nominal_point = points[-conf_rank][0]

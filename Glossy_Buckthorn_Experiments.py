@@ -332,7 +332,7 @@ def RSVF(valuefunctions, posterior_transition_points, num_samples, num_update, \
             rsol = rmdp.rsolve_mpi(b"robust_l1",threshold)
             
             violation = 0
-    
+            
             #If the whole MDP is unchanged, meaning the new value function didn't change the uncertanty
             #set for any state-action, no need to iterate more!
             if is_mdp_unchanged or i==num_update-1:
@@ -347,12 +347,12 @@ def RSVF(valuefunctions, posterior_transition_points, num_samples, num_update, \
                 
                 under_estimate = abs(np.dot(initial,orig_sol.valuefunction) -\
                                                         np.dot(initial,rsol.valuefunction))
-
+                
                 real_regret = abs(np.dot(initial,orig_sol.valuefunction) -\
                                                         np.dot(initial,ropt_sol.valuefunction))
                 
                 violation = 1 if (np.dot(initial, ropt_sol.valuefunction) - \
-                                                np.dot(initial, rsol.valuefunction)) < 0 else 0  
+                                                np.dot(initial, rsol.valuefunction)) < 0 else 0
                 break
             
             valuefunction = rsol.valuefunction
@@ -443,7 +443,7 @@ if __name__ == "__main__":
                 orig_sol = est_true_mdp.solve_mpi()
                 orig_policy = orig_sol.policy
                 
-                #Solve the RMDPs. For RSVF, invoke the responsible method to process futher computations
+                #Solve the RMDPs. For RSVF, invoke the responsible method to process further computations
                 for m in range(Methods.NUM_METHODS.value):
                     if LI_METHODS[m] not in compare_methods:
                         pass
@@ -485,6 +485,13 @@ with open('dumped_results/GlossyBuckthorn_result_num_iterations_'+str(num_iterat
 ### Plot results
 #print(calc_return)
 #generic_plot(sample_steps, calc_return, "Number of samples", "Total expected return n (initial distribution x valuefunction)")
+import pickle
+
+f = open('dumped_results/GlossyBuckthorn_result_num_iterations_10_num_simulation_1_runs_100_sample_step_10_confidence_level_0.9', 'rb')   # 'r' for reading; can be omitted
+gauss_results = pickle.load(f)         # load file content as mydict
+f.close()  
+
+under_estimation, real_regret, violations = gauss_results[0], gauss_results[1], gauss_results[2]
 
 plot_MDP_returns(sample_steps, under_estimation, figure_name="Glossy_Buckthorn_Under_Estimation.pdf")
 
